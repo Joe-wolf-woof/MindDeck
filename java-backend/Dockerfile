@@ -6,6 +6,9 @@ WORKDIR /app
 # プロジェクトのファイルをすべてコンテナ内にコピー
 COPY . .
 
+# ▼【追加】gradlewにLinux用の実行権限を付与する
+RUN chmod +x gradlew
+
 # Gradleでビルドを実行
 RUN ./gradlew bootJar --no-daemon
 

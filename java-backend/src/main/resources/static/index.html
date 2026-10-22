@@ -65,9 +65,9 @@
                 <input type="text" id="searchInput" placeholder="キーワードで検索..." oninput="searchCards()">
             </div>
             <div class="panel">
-                <h2>📚 ノートブック</h2>
-                <input type="text" id="newNotebookTitle" placeholder="例: 認知心理学, XR基礎">
-                <button onclick="createNotebook()">作成</button>
+                <h2>📚 ノートブック作成</h2>
+                <input type="text" id="notebookTitleInput" placeholder="例: 認知心理学, XR基礎">
+                <button onclick="createNotebook()" style="margin-top: 6px;">ノートブックを作成</button>
                 <ul class="notebook-list" id="notebookList" style="margin-top: 12px;"></ul>
             </div>
         </div>
@@ -85,14 +85,14 @@
                     <div style="margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
                         <h2 style="border:none; margin-bottom:5px;">用語の追加</h2>
                         
-                        <!-- ▼ プルダウン選択を追加 -->
+                        <!-- プルダウン選択 -->
                         <label style="font-size: 0.85rem; color: var(--text-sub);">保存先ノートブック:</label>
                         <select id="notebookSelect">
                             <option value="">-- ノートブックを選択してください --</option>
                         </select>
 
-                        <input type="text" id="cardTerm" placeholder="用語 (例: アフォーダンス)">
-                        <textarea id="cardExpl" rows="2" placeholder="解説文を入力..."></textarea>
+                        <input type="text" id="termInput" placeholder="用語 (例: アフォーダンス)">
+                        <textarea id="explanationInput" rows="2" placeholder="解説文を入力..."></textarea>
                         <button onclick="createCard()">カードを保存</button>
                     </div>
                     <h2 id="currentNotebookTitle">単語カード一覧</h2>
@@ -118,62 +118,63 @@
         let currentNotebookTitleText = '';
         let currentNotebookCards = [];
 
-        // ノートブック一覧を取得し、左側リストと右側プルダウンの両方を更新する
-        async function fetchNotebooks() {
+        // ページ読み込み時にサーバーからノートブック一覧を取得してプルダウンとリストを埋める
+        async function loadNotebooks() {
             try {
-                const res = await fetch(`${JAVA_API}/notebooks`);
-                const notebooks = await res.json();
+                const response = await fetch(`${JAVA_API}/notebooks`);
+                const notebooks = await response.json();
                 
                 // 1. 左側リストの更新
                 const listEl = document.getElementById('notebookList');
                 listEl.innerHTML = '';
 
                 // 2. 右側プルダウンの更新
-                const selectEl = document.getElementById('notebookSelect');
-                selectEl.innerHTML = '<option value="">-- ノートブックを選択してください --</option>';
-
+                const select = document.getElementById('notebookSelect');
+                select.innerHTML = '<option value="">-- ノートブックを選択してください --</option>';
+                
                 notebooks.forEach(nb => {
-                    // 左側のリストアイテム生成
+                    // 左側リストアイテム
                     const li = document.createElement('li');
                     li.className = `notebook-item ${currentNotebookId === nb.id ? 'active' : ''}`;
                     li.innerText = nb.title;
                     li.onclick = () => selectNotebook(nb.id, nb.title);
                     listEl.appendChild(li);
 
-                    // 右側のプルダウン選択肢生成
+                    // 右側プルダウン選択肢
                     const option = document.createElement('option');
                     option.value = nb.id;
                     option.textContent = nb.title;
                     if (currentNotebookId === nb.id) {
                         option.selected = true;
                     }
-                    selectEl.appendChild(option);
+                    select.appendChild(option);
                 });
             } catch (e) {
                 console.error('ノートブックの取得に失敗しました', e);
             }
         }
 
-        // ノートブックを新規作成する
+        // 1. ノートブックを新規作成する関数
         async function createNotebook() {
-            const titleInput = document.getElementById('newNotebookTitle');
+            const titleInput = document.getElementById('notebookTitleInput');
             const title = titleInput.value.trim();
+            
             if (!title) {
                 alert('ノートブック名を入力してください');
                 return;
             }
 
             try {
-                const res = await fetch(`${JAVA_API}/notebooks`, {
+                const response = await fetch(`${JAVA_API}/notebooks`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ title: title })
                 });
-
-                if (res.ok) {
+                
+                if (response.ok) {
                     titleInput.value = '';
                     alert('ノートブックを作成しました！');
-                    fetchNotebooks(); // 一覧とプルダウンを最新に更新
+                    loadNotebooks(); // プルダウンとリストの選択肢を最新に更新
                 } else {
                     alert('ノートブックの作成に失敗しました');
                 }
@@ -188,7 +189,7 @@
             currentNotebookTitleText = title;
             document.getElementById('currentNotebookTitle').innerText = `「${title}」のカード`;
             
-            // プルダウンの選択状態も連動させる
+            // プルダウンの選択も連動させる
             document.getElementById('notebookSelect').value = id;
             
             fetchNotebooks();
@@ -205,7 +206,7 @@
             }
         }
 
-        // プルダウンからノートブックを変更したときにもカード一覧を切り替える連携
+        // プルダウンを変更したときにもカード一覧を切り替える
         document.getElementById('notebookSelect').addEventListener('change', function() {
             const selectedId = this.value;
             const selectedText = this.options[this.selectedIndex].text;
@@ -214,30 +215,31 @@
             }
         });
 
-        // 単語カードを登録する（プルダウンで選ばれたノートブックに対して保存）
+        // 2. 選択したノートブックに対して単語カードを登録する関数
         async function createCard() {
             const notebookId = document.getElementById('notebookSelect').value;
-            if (!notebookId) { 
-                alert('保存先のノートブックを選択してください！'); 
-                return; 
+            const term = document.getElementById('termInput').value.trim();
+            const explanation = document.getElementById('explanationInput').value.trim();
+
+            if (!notebookId) {
+                alert('登録先のノートブックを選択してください');
+                return;
             }
-            const term = document.getElementById('cardTerm').value.trim();
-            const explanation = document.getElementById('cardExpl').value.trim();
             if (!term || !explanation) {
-                alert('用語と解説の両方を入力してください！');
+                alert('用語と解説の両方を入力してください');
                 return;
             }
 
             try {
-                const res = await fetch(`${JAVA_API}/notebooks/${notebookId}/cards`, {
+                const response = await fetch(`${JAVA_API}/notebooks/${notebookId}/cards`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ term, explanation })
                 });
-
-                if (res.ok) {
-                    document.getElementById('cardTerm').value = '';
-                    document.getElementById('cardExpl').value = '';
+                
+                if (response.ok) {
+                    document.getElementById('termInput').value = '';
+                    document.getElementById('explanationInput').value = '';
                     alert('単語カードを保存しました！');
                     selectNotebook(Number(notebookId), document.getElementById('notebookSelect').options[document.getElementById('notebookSelect').selectedIndex].text);
                 } else {
@@ -303,4 +305,37 @@
                     <div style="margin-top: 15px;">`;
                 
                 quiz.choices.forEach(choice => {
-                    html +=
+                    html += `<button class="choice-btn" onclick="checkAnswer(this, '${choice}', '${quiz.correct_answer}')">${choice}</button>`;
+                });
+                html += `</div><div class="result-msg" id="quizResult"></div></div>`;
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = '<p style="color: var(--error);">Pythonクイズサーバー（FastAPI）に接続できません。</p>';
+            }
+        }
+
+        function checkAnswer(btn, selected, correct) {
+            const allBtns = document.querySelectorAll('.choice-btn');
+            allBtns.forEach(b => b.disabled = true);
+            const resMsg = document.getElementById('quizResult');
+            if (selected === correct) {
+                btn.style.background = '#22c55e';
+                btn.style.color = '#0f172a';
+                resMsg.style.color = '#22c55e';
+                resMsg.innerText = '正解です！素晴らしい！ 🎉';
+            } else {
+                btn.style.background = '#ef4444';
+                btn.style.color = '#ffffff';
+                resMsg.style.color = '#ef4444';
+                resMsg.innerText = `不正解… 正解は「${correct}」でした。`;
+                allBtns.forEach(b => { if (b.innerText === correct) { b.style.background = '#22c55e'; b.style.color = '#0f172a'; } });
+            }
+        }
+
+        // 画面が読み込まれたときに自動でノートブック一覧を読み込む
+        window.addEventListener('DOMContentLoaded', () => {
+            loadNotebooks();
+        });
+    </script>
+</body>
+</html>

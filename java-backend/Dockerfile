@@ -6,7 +6,7 @@ WORKDIR /app
 # プロジェクトのファイルをすべてコンテナ内にコピー
 COPY . .
 
-# ▼【追加】gradlewにLinux用の実行権限を付与する
+# gradlewにLinux用の実行権限を付与
 RUN chmod +x gradlew
 
 # Gradleでビルドを実行
@@ -15,5 +15,5 @@ RUN ./gradlew bootJar --no-daemon
 # アプリケーションが使用するポートを指定
 EXPOSE 8080
 
-# アプリケーションの起動コマンド
-CMD ["java", "-jar", "build/libs/*.jar"]
+# ▼【修正】配列形式ではなく、シェル形式（または sh -c）に変更する
+CMD ["sh", "-c", "java -jar build/libs/*.jar"]

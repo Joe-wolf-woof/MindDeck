@@ -155,9 +155,9 @@
         }
 
         // 1. ノートブックを新規作成する関数
-        async function createNotebook() {
-            const titleInput = document.getElementById('notebookTitleInput');
-            const title = titleInput.value.trim();
+		async function createNotebook() {
+		const titleInput = document.getElementById('notebookTitleInput'); // ⭕️ HTMLと合わせる
+		const title = titleInput.value.trim();
             
             if (!title) {
                 alert('ノートブック名を入力してください');

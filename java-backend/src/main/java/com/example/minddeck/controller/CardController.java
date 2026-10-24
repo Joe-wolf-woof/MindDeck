@@ -63,6 +63,18 @@ public class CardController {
     public void deleteCard(@PathVariable Long id) {
         cardRepository.deleteById(id);
     }
+    
+ // カード更新（編集）
+    @PutMapping("/cards/{id}")
+    public Card updateCard(@PathVariable Long id, @RequestBody CardRequest cardRequest) {
+        Card card = cardRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Card not found"));
+        
+        card.setTerm(cardRequest.getTerm());
+        card.setExplanation(cardRequest.getExplanation());
+        
+        return cardRepository.save(card);
+    }
 
     // リクエスト受信用クラス
     public static class CardRequest {

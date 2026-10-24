@@ -21,9 +21,9 @@ app.add_middleware(
 SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "YOUR_SERPER_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY")
 
-# Gemini APIの初期化（現在安定して利用できる最新主力モデル）
+# Gemini APIの初期化（エラーメッセージが指定する最新モデルに変更）
 genai.configure(api_key=GEMINI_API_KEY)
-ai_model = genai.GenerativeModel("gemini-2.0-flash")
+ai_model = genai.GenerativeModel("gemini-3.8-flash")
 
 class CardItem(BaseModel):
     term: str

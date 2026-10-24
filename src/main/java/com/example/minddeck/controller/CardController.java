@@ -29,40 +29,40 @@ public class CardController {
     @Autowired
     private CardRepository cardRepository;
 
-    // 1. ノートブック一覧を取得 (GET /api/notebooks)
+    // ノートブック一覧取得 (GET /api/notebooks)
     @GetMapping("/notebooks")
     public List<Notebook> getAllNotebooks() {
         return notebookRepository.findAll();
     }
 
-    // 2. ノートブックを新規作成 (POST /api/notebooks)  <-- ★ここが重要です！
+    // ノートブック新規作成 (POST /api/notebooks)
     @PostMapping("/notebooks")
     public Notebook createNotebook(@RequestBody Notebook notebook) {
         return notebookRepository.save(notebook);
     }
 
-    // 3. 指定したノートブックの単語カード一覧を取得 (GET /api/notebooks/{notebookId}/cards)
+    // 特定ノートブックの単語一覧取得 (GET /api/notebooks/{notebookId}/cards)
     @GetMapping("/notebooks/{notebookId}/cards")
     public List<Card> getCardsByNotebook(@PathVariable Long notebookId) {
         return cardRepository.findByNotebookId(notebookId);
     }
 
-    // 4. 指定したノートブックにカードを追加 (POST /api/notebooks/{notebookId}/cards)
+    // 単語登録 (POST /api/notebooks/{notebookId}/cards)
     @PostMapping("/notebooks/{notebookId}/cards")
     public Card createCard(@PathVariable Long notebookId, @RequestBody Card cardRequest) {
-        Notebook nb = notebookRepository.findById(notebookId)
+        Notebook notebook = notebookRepository.findById(notebookId)
                 .orElseThrow(() -> new RuntimeException("Notebook not found"));
-        cardRequest.setNotebook(nb);
+        cardRequest.setNotebook(notebook);
         return cardRepository.save(cardRequest);
     }
 
-    // 5. 逆引き検索 (GET /api/cards/search?keyword=...)
+    // 逆引き検索 (GET /api/cards/search)
     @GetMapping("/cards/search")
     public List<Card> searchCards(@RequestParam String keyword) {
         return cardRepository.searchCards(keyword);
     }
 
-    // 6. カード削除 (DELETE /api/cards/{id})
+    // 単語削除 (DELETE /api/cards/{id})
     @DeleteMapping("/cards/{id}")
     public void deleteCard(@PathVariable Long id) {
         cardRepository.deleteById(id);

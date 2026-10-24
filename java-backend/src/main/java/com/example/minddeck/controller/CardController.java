@@ -1,22 +1,13 @@
 package com.example.minddeck.controller;
 
-import java.util.List;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
 import com.example.minddeck.model.Card;
 import com.example.minddeck.model.Notebook;
 import com.example.minddeck.repository.CardRepository;
 import com.example.minddeck.repository.NotebookRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api")
@@ -24,59 +15,63 @@ import com.example.minddeck.repository.NotebookRepository;
 public class CardController {
 
     @Autowired
-    private NotebookRepository notebookRepository;
-
-    @Autowired
     private CardRepository cardRepository;
 
-    // ノートブック一覧取得 (GET /api/notebooks)
+    @Autowired
+    private NotebookRepository notebookRepository;
+
+    // ノートブック一覧取得
     @GetMapping("/notebooks")
     public List<Notebook> getAllNotebooks() {
         return notebookRepository.findAll();
     }
 
-    // ノートブック新規作成 (POST /api/notebooks)
+    // ノートブック作成
     @PostMapping("/notebooks")
     public Notebook createNotebook(@RequestBody Notebook notebook) {
         return notebookRepository.save(notebook);
     }
 
-    // 特定ノートブックの単語一覧取得 (GET /api/notebooks/{notebookId}/cards)
+    // 特定ノートブックの単語・カード一覧取得
     @GetMapping("/notebooks/{notebookId}/cards")
-    public List<Card> getCardsByNotebook(@PathVariable Long notebookId) {
+    public List<Card> getCardsByNotebookId(@PathVariable Long notebookId) {
         return cardRepository.findByNotebookId(notebookId);
     }
 
-    // 単語登録 (POST /api/notebooks/{notebookId}/cards)
+    // 特定ノートブックの単語カード登録
     @PostMapping("/notebooks/{notebookId}/cards")
     public Card createCard(@PathVariable Long notebookId, @RequestBody CardRequest cardRequest) {
         Notebook notebook = notebookRepository.findById(notebookId)
-            .orElseThrow(() -> new RuntimeException("Notebook not found"));
-
+                .orElseThrow(() -> new RuntimeException("Notebook not found"));
+        
         Card card = new Card();
         card.setTerm(cardRequest.getTerm());
         card.setExplanation(cardRequest.getExplanation());
         card.setNotebook(notebook);
-
+        
         return cardRepository.save(card);
     }
-   /* @PostMapping("/notebooks/{notebookId}/cards")
-    public Card createCard(@PathVariable Long notebookId, @RequestBody Card cardRequest) {
-        Notebook notebook = notebookRepository.findById(notebookId)
-                .orElseThrow(() -> new RuntimeException("Notebook not found"));
-        cardRequest.setNotebook(notebook);
-        return cardRepository.save(cardRequest);*/
-    }
 
-    // 逆引き検索 (GET /api/cards/search)
+    // 逆引き全体検索
     @GetMapping("/cards/search")
-    public List<Card> searchCards(@RequestParam String keyword) {
+    public List<Card> searchCards(@RequestParam("keyword") String keyword) {
         return cardRepository.searchCards(keyword);
     }
 
-    // 単語削除 (DELETE /api/cards/{id})
+    // カード削除
     @DeleteMapping("/cards/{id}")
     public void deleteCard(@PathVariable Long id) {
         cardRepository.deleteById(id);
+    }
+
+    // リクエスト受信用クラス
+    public static class CardRequest {
+        private String term;
+        private String explanation;
+
+        public String getTerm() { return term; }
+        public void setTerm(String term) { this.term = term; }
+        public String getExplanation() { return explanation; }
+        public void setExplanation(String explanation) { this.explanation = explanation; }
     }
 }

@@ -154,34 +154,37 @@
             }
         }
 
-        // 1. ノートブックを新規作成する関数
+		// 1. ノートブックを新規作成する関数（エラー詳細を表示するように改良）
 		async function createNotebook() {
-		const titleInput = document.getElementById('notebookTitleInput'); // ⭕️ HTMLと合わせる
-		const title = titleInput.value.trim();
-            
-            if (!title) {
-                alert('ノートブック名を入力してください');
-                return;
-            }
+		    const titleInput = document.getElementById('notebookTitleInput');
+		    const title = titleInput.value.trim();
+		    
+		    if (!title) {
+		        alert('ノートブック名を入力してください');
+		        return;
+		    }
 
-            try {
-                const response = await fetch(`${JAVA_API}/notebooks`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: title })
-                });
-                
-                if (response.ok) {
-                    titleInput.value = '';
-                    alert('ノートブックを作成しました！');
-                    loadNotebooks(); // プルダウンとリストの選択肢を最新に更新
-                } else {
-                    alert('ノートブックの作成に失敗しました');
-                }
-            } catch (e) {
-                console.error('通信エラー:', e);
-            }
-        }
+		    try {
+		        const response = await fetch(`${JAVA_API}/notebooks`, {
+		            method: 'POST',
+		            headers: { 'Content-Type': 'application/json' },
+		            body: JSON.stringify({ title: title })
+		        });
+		        
+		        if (response.ok) {
+		            titleInput.value = '';
+		            alert('ノートブックを作成しました！');
+		            loadNotebooks(); // プルダウンとリストの選択肢を最新に更新
+		        } else {
+		            // サーバーから返されたエラーの詳細をテキストで取得して表示する
+		            const errorText = await response.text();
+		            alert(`作成失敗 (ステータス: ${response.status})\n詳細: ${errorText}`);
+		        }
+		    } catch (e) {
+		        console.error('通信エラー:', e);
+		        alert('通信エラーが発生しました: ' + e.message);
+		    }
+		}
 
         // ノートブックを選択したときの処理
         async function selectNotebook(id, title) {

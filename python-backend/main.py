@@ -34,8 +34,10 @@ def generate_quiz(data: QuizRequest):
     if re.search(pattern, explanation, re.IGNORECASE):
         masked_explanation = re.sub(pattern, "[ ＿＿＿＿ ]", explanation, flags=re.IGNORECASE)
     else:
-        masked_explanation = f"【解説ヒント】{explanation}\n\nこの解説が示す用語は何でしょう？"
+        # ③ 【解説ヒント】を【解説】に統一
+        masked_explanation = f"【解説】\n{explanation}\n\nこの解説が示す用語は何でしょう？"
     
+    # 選択肢のバリエーション（難易度アップ用プール）
     other_terms = [c.term for c in all_cards if c.term != term]
     fallback_pool = ["アフォーダンス", "認知バイアス", "スキーマ", "WebXR", "シャドーイング", "メタ認知", "エピソード記憶", "シナプス"]
     for d in fallback_pool:

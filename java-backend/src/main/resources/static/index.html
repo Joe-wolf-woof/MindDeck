@@ -108,7 +108,8 @@
 
                 <!-- クイズタブ -->
                 <div id="quizView" style="display: none;">
-                    <h2>自動生成穴埋めクイズ</h2>
+                    <!-- ① タイトルを変更 -->
+                    <h2>AI自動生成 用語クイズ</h2>
                     <div id="quizContainer">
                         <p style="color: var(--text-sub);">ノートブックを選択し、クイズを生成してください。</p>
                     </div>
@@ -151,10 +152,24 @@
         let currentNotebookId = null;
         let currentNotebookTitleText = '';
         let currentNotebookCards = [];
+        let allSystemCards = []; // 選択肢のバリエーション（難易度アップ）用に全カードを保持
 
         window.addEventListener('DOMContentLoaded', () => {
             fetchNotebooks();
+            fetchAllCardsForQuizPool(); // 全カードプールを取得
         });
+
+        // 選択肢の難易度アップのために全カードを取得する
+        async function fetchAllCardsForQuizPool() {
+            try {
+                const res = await fetch(`${JAVA_API}/cards/search?keyword=`);
+                if (res.ok) {
+                    allSystemCards = await res.json();
+                }
+            } catch (e) {
+                console.error('クイズ用カードプールの取得に失敗', e);
+            }
+        }
 
         async function fetchNotebooks() {
             try {
@@ -258,6 +273,7 @@
                     termInput.value = '';
                     explInput.value = '';
                     selectNotebook(currentNotebookId, currentNotebookTitleText);
+                    fetchAllCardsForQuizPool(); // クイズ用プールも更新
                 } else {
                     alert('カードの保存に失敗しました');
                 }
@@ -331,7 +347,6 @@
             document.getElementById('editModal').style.display = 'none';
         }
 
-        // カード更新処理（PUTメソッドに戻す）
         async function updateCard() {
             const cardId = document.getElementById('editCardId').value;
             const term = document.getElementById('editTerm').value.trim();
@@ -344,13 +359,14 @@
 
             try {
                 const res = await fetch(`${JAVA_API}/cards/${cardId}`, {
-                    method: 'PUT', // Java側の @PutMapping に合わせる
+                    method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ term, explanation })
                 });
                 if (res.ok) {
                     closeEditModal();
                     selectNotebook(currentNotebookId, currentNotebookTitleText);
+                    fetchAllCardsForQuizPool();
                 } else {
                     alert('カードの更新に失敗しました');
                 }
@@ -360,18 +376,18 @@
             }
         }
 
-        // カード削除処理（DELETEメソッドに戻す）
         async function deleteCard() {
             const cardId = document.getElementById('editCardId').value;
             if (!confirm('本当にこのカードを削除しますか？')) return;
 
             try {
                 const res = await fetch(`${JAVA_API}/cards/${cardId}`, {
-                    method: 'DELETE' // Java側の @DeleteMapping に合わせる
+                    method: 'DELETE'
                 });
                 if (res.ok) {
                     closeEditModal();
                     selectNotebook(currentNotebookId, currentNotebookTitleText);
+                    fetchAllCardsForQuizPool();
                 } else {
                     alert('カードの削除に失敗しました');
                 }
@@ -380,7 +396,7 @@
                 alert('通信エラーが発生しました');
             }
         }
-        
+
         async function searchCards() {
             const keyword = document.getElementById('searchInput').value.trim();
             if (!keyword) {
@@ -422,36 +438,54 @@
             if (tab === 'quiz') loadQuiz();
         }
 
+        // クイズ生成処理（難易度アップ ＆ テキスト変更）
         async function loadQuiz() {
             const container = document.getElementById('quizContainer');
             if (!currentNotebookId || !currentNotebookCards || currentNotebookCards.length === 0) {
                 container.innerHTML = '<p style="color: var(--text-sub);">ノートブックを選択し、カードを登録してください。</p>';
                 return;
             }
+            
+            // 出題対象は現在のノートブックからランダム選択
             const target = currentNotebookCards[Math.floor(Math.random() * currentNotebookCards.length)];
+
+            // 選択肢（誤答肢）のバリエーションを増やすため、全カード情報もプールとしてまとめる
+            const cardPool = (allSystemCards.length > currentNotebookCards.length) 
+                ? allSystemCards 
+                : currentNotebookCards;
 
             try {
                 const response = await fetch(`${PYTHON_API}/generate-quiz`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ target: target, all_cards: currentNotebookCards })
+                    body: JSON.stringify({ target: target, all_cards: cardPool })
                 });
                 if (!response.ok) throw new Error();
                 const quiz = await response.json();
 
+                // ③ 【解説ヒント】があれば【解説】に変更する処理
+                let formattedQuestion = quiz.question || target.explanation;
+                formattedQuestion = formattedQuestion.replace(/【解説ヒント】/g, '【解説】');
+
+                // ② 問題文見出しテキストの変更
                 let html = `<div class="card-card" style="cursor:default;">
-                    <p style="font-weight: bold; color: #818cf8; margin-top:0;">Q. 空欄に入る用語は何でしょう？</p>
-                    <p style="background: #1e293b; padding: 12px; border-radius: 6px; line-height: 1.6;">${quiz.question}</p>
+                    <p style="font-weight: bold; color: #818cf8; margin-top:0;">Q. 次の用語は何でしょう？</p>
+                    <p style="background: #1e293b; padding: 12px; border-radius: 6px; line-height: 1.6;">${formattedQuestion}</p>
                     <div style="margin-top: 15px;">`;
                 
                 quiz.choices.forEach(choice => {
-                    html += `<button type="button" class="choice-btn" onclick="checkAnswer(this, '${choice}', '${quiz.correct_answer}')">${choice}</button>`;
+                    html += `<button type="button" class="choice-btn" onclick="checkAnswer(this, '${escapeHtml(choice)}', '${escapeHtml(quiz.correct_answer)}')">${escapeHtml(choice)}</button>`;
                 });
                 html += `</div><div id="quizResult" style="margin-top: 10px; font-weight: bold;"></div></div>`;
                 container.innerHTML = html;
             } catch (e) {
                 container.innerHTML = '<p style="color: #ef4444;">Pythonクイズサーバー（FastAPI）に接続できません。</p>';
             }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
         }
 
         function checkAnswer(btn, selected, correct) {

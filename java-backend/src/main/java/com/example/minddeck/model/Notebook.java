@@ -1,5 +1,6 @@
 package com.example.minddeck.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +27,7 @@ public class Notebook {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @OneToMany(mappedBy = "notebook", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     private List<Card> cards = new ArrayList<>();
 
     public Notebook() {}

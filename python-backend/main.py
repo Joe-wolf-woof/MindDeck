@@ -18,12 +18,16 @@ app.add_middleware(
 class CardItem(BaseModel):
     term: str
     explanation: str
+    tags: str | None = None
 
 class QuizRequest(BaseModel):
     target: CardItem
     all_cards: list[CardItem]
 
-# Wikipedia APIから正解の用語に関連するキーワードを検索して取得する関数
+class AiGenRequest(BaseModel):
+    term: str
+
+# Wikipedia APIから関連用語を検索して取得する関数（クイズ難易度アップ用）
 def search_related_terms_from_wikipedia(keyword: str) -> list[str]:
     try:
         url = "https://ja.wikipedia.org/w/api.php"
@@ -39,13 +43,60 @@ def search_related_terms_from_wikipedia(keyword: str) -> list[str]:
         if res.status_code == 200:
             data = res.json()
             search_results = data.get("query", {}).get("search", [])
-            # 検索結果のタイトルを関連用語の候補として抽出
-            titles = [item.get("title") for item in search_results]
-            return titles
+            return [item.get("title") for item in search_results]
     except Exception as e:
         print("Wikipedia search error:", e)
     return []
 
+# ③ 用語から解説を自動生成するAIエンドポイント
+@app.post("/api/ai-generate-explanation")
+def ai_generate_explanation(data: AiGenRequest):
+    term = data.term.strip()
+    if not term:
+        return {"explanation": "用語が入力されていません。"}
+    
+    try:
+        url = "https://ja.wikipedia.org/w/api.php"
+        # 1. Wikipediaのイントロ文章を自動取得
+        params = {
+            "action": "query",
+            "prop": "extracts",
+            "exintro": True,
+            "explaintext": True,
+            "titles": term,
+            "format": "json"
+        }
+        headers = {"User-Agent": "MindDeckApp/1.0"}
+        res = requests.get(url, params=params, headers=headers, timeout=3)
+        if res.status_code == 200:
+            pages = res.json().get("query", {}).get("pages", {})
+            for page_id, page_info in pages.items():
+                if page_id != "-1" and "extract" in page_info:
+                    extract = page_info["extract"]
+                    if extract:
+                        return {"explanation": extract[:250] + ("..." if len(extract) > 250 else "")}
+        
+        # 2. 見つからない場合は検索スニペットを利用
+        search_params = {
+            "action": "query",
+            "list": "search",
+            "srsearch": term,
+            "format": "json",
+            "srlimit": 1
+        }
+        s_res = requests.get(url, params=search_params, headers=headers, timeout=3)
+        if s_res.status_code == 200:
+            s_data = s_res.json().get("query", {}).get("search", [])
+            if s_data:
+                snippet = re.sub(r'<.*?>', '', s_data[0].get("snippet", ""))
+                return {"explanation": f"{snippet}..."}
+                
+    except Exception as e:
+        print("AI generation error:", e)
+
+    return {"explanation": f"「{term}」に関する自動解説が見つかりませんでした。手動で入力してください。"}
+
+# クイズ生成エンドポイント
 @app.post("/api/generate-quiz")
 def generate_quiz(data: QuizRequest):
     target = data.target
@@ -54,23 +105,20 @@ def generate_quiz(data: QuizRequest):
     term = target.term
     explanation = target.explanation
     
-    # 穴埋めまたは解説文の作成
     pattern = re.escape(term)
     if re.search(pattern, explanation, re.IGNORECASE):
         masked_explanation = re.sub(pattern, "[ ＿＿＿＿ ]", explanation, flags=re.IGNORECASE)
     else:
         masked_explanation = f"【解説】\n{explanation}\n\nこの解説が示す用語は何でしょう？"
     
-    # 1. 登録されている既存カードから候補を集める
     other_terms = [c.term for c in all_cards if c.term != term]
     
-    # 2. ★用語数が少ない場合やバリエーションを増やすため、Wikipediaで関連用語を自動検索
+    # 関連用語をWikipediaから補填してダミーの難易度を上げる
     wiki_terms = search_related_terms_from_wikipedia(term)
     for w in wiki_terms:
-        if w != term and w not in other_terms and len(w) <= 15: # 長すぎるタイトルを除外
+        if w != term and w not in other_terms and len(w) <= 15:
             other_terms.append(w)
             
-    # 3. それでも足りない場合のバックアップ用プール（心理学・IT用語など）
     fallback_pool = [
         "アフォーダンス", "認知バイアス", "スキーマ", "WebXR", 
         "シャドーイング", "メタ認知", "エピソード記憶", "シナプス",
@@ -80,7 +128,6 @@ def generate_quiz(data: QuizRequest):
         if d not in other_terms and d != term:
             other_terms.append(d)
             
-    # 4. 候補の中からランダムに3つ選んでダミー選択肢とする
     selected_dummies = random.sample(other_terms, min(3, len(other_terms)))
     choices = selected_dummies + [term]
     random.shuffle(choices)

@@ -31,6 +31,9 @@ public class Card {
     @Column(columnDefinition = "TEXT")
     private String explanation;
 
+    // ① タグ用フィールドを追加
+    private String tags;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -48,6 +51,9 @@ public class Card {
 
     public String getExplanation() { return explanation; }
     public void setExplanation(String explanation) { this.explanation = explanation; }
+
+    public String getTags() { return tags; }
+    public void setTags(String tags) { this.tags = tags; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

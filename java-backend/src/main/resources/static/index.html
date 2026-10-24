@@ -331,59 +331,56 @@
             document.getElementById('editModal').style.display = 'none';
         }
 
-		// カード更新処理（PUT → POSTに変更）
-		async function updateCard() {
-		    const cardId = document.getElementById('editCardId').value;
-		    const term = document.getElementById('editTerm').value.trim();
-		    const explanation = document.getElementById('editExpl').value.trim();
+        // カード更新処理（PUTメソッドに戻す）
+        async function updateCard() {
+            const cardId = document.getElementById('editCardId').value;
+            const term = document.getElementById('editTerm').value.trim();
+            const explanation = document.getElementById('editExpl').value.trim();
 
-		    if (!term || !explanation) {
-		        alert('用語と解説を入力してください。');
-		        return;
-		    }
+            if (!term || !explanation) {
+                alert('用語と解説を入力してください。');
+                return;
+            }
 
-		    try {
-		        // Java側が POST にしか対応していない場合、URLを /api/cards/${cardId}/update などのPOST用にするか、methodをPOSTに変更します
-		        // ※Java側の設計に合わせてURLやメソッドを調整してください
-		        const res = await fetch(`${JAVA_API}/cards/${cardId}`, {
-		            method: 'POST', // ← PUTからPOSTに変更
-		            headers: { 'Content-Type': 'application/json' },
-		            body: JSON.stringify({ term, explanation })
-		        });
-		        if (res.ok) {
-		            closeEditModal();
-		            selectNotebook(currentNotebookId, currentNotebookTitleText);
-		        } else {
-		            alert('カードの更新に失敗しました');
-		        }
-		    } catch (e) {
-		        console.error(e);
-		        alert('通信エラーが発生しました');
-		    }
-		}
+            try {
+                const res = await fetch(`${JAVA_API}/cards/${cardId}`, {
+                    method: 'PUT', // Java側の @PutMapping に合わせる
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ term, explanation })
+                });
+                if (res.ok) {
+                    closeEditModal();
+                    selectNotebook(currentNotebookId, currentNotebookTitleText);
+                } else {
+                    alert('カードの更新に失敗しました');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('通信エラーが発生しました');
+            }
+        }
 
-		// カード削除処理（DELETE → POSTに変更する場合）
-		async function deleteCard() {
-		    const cardId = document.getElementById('editCardId').value;
-		    if (!confirm('本当にこのカードを削除しますか？')) return;
+        // カード削除処理（DELETEメソッドに戻す）
+        async function deleteCard() {
+            const cardId = document.getElementById('editCardId').value;
+            if (!confirm('本当にこのカードを削除しますか？')) return;
 
-		    try {
-		        const res = await fetch(`${JAVA_API}/cards/${cardId}`, {
-		            method: 'POST', // ← DELETEからPOSTに変更（または /api/cards/${cardId}/delete など）
-		            headers: { 'Content-Type': 'application/json' }
-		        });
-		        if (res.ok) {
-		            closeEditModal();
-		            selectNotebook(currentNotebookId, currentNotebookTitleText);
-		        } else {
-		            alert('カードの削除に失敗しました');
-		        }
-		    } catch (e) {
-		        console.error(e);
-		        alert('通信エラーが発生しました');
-		    }
-		}
-		
+            try {
+                const res = await fetch(`${JAVA_API}/cards/${cardId}`, {
+                    method: 'DELETE' // Java側の @DeleteMapping に合わせる
+                });
+                if (res.ok) {
+                    closeEditModal();
+                    selectNotebook(currentNotebookId, currentNotebookTitleText);
+                } else {
+                    alert('カードの削除に失敗しました');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('通信エラーが発生しました');
+            }
+        }
+        
         async function searchCards() {
             const keyword = document.getElementById('searchInput').value.trim();
             if (!keyword) {

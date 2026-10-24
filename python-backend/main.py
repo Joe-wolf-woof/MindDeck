@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import random
 import re
-import requests
+from duckduckgo_search import DDGS
 
 app = FastAPI()
 
@@ -31,53 +31,61 @@ class AiGenRequest(BaseModel):
     term: str
     field: str | None = None
 
-def search_related_terms_from_wikipedia(keyword: str) -> list[str]:
+# 広範囲のWebサイトを横断検索する関数
+def search_web_general(query: str, max_results=5) -> list[dict]:
+    results = []
     try:
-        url = "https://ja.wikipedia.org/w/api.php"
-        params = {"action": "query", "list": "search", "srsearch": keyword, "format": "json", "srlimit": 5}
-        headers = {"User-Agent": "MindDeckQuizApp/1.0"}
-        res = requests.get(url, params=params, headers=headers, timeout=3)
-        if res.status_code == 200:
-            return [item.get("title") for item in res.json().get("query", {}).get("search", [])]
+        with DDGS() as ddgs:
+            for r in ddgs.text(query, region="jp-jp", max_results=max_results):
+                results.append({
+                    "title": r.get("title", ""),
+                    "body": r.get("body", ""),
+                    "href": r.get("href", "")
+                })
     except Exception as e:
-        print("Wikipedia search error:", e)
-    return []
+        print("Web search error:", e)
+    return results
 
-# ① 用語に関連する分野候補を動的に生成して返す
+# ① 広範囲のWeb検索から分野候補を自動生成
 @app.post("/api/ai-get-fields")
 def ai_get_fields(data: AiFieldsRequest):
     term = data.term.strip()
     if not term:
-        return {"fields": ["コンピュータサイエンス", "生物学", "言語学", "一般"]}
+        return {"fields": ["コンピュータサイエンス", "経済・ビジネス", "心理学", "一般"]}
     
-    # 基本の主要分野 ＋ Wikipediaの検索結果から得た文脈を組み合わせる
-    fields = ["コンピュータサイエンス", "生物学", "言語学", "一般"]
-    try:
-        url = "https://ja.wikipedia.org/w/api.php"
-        params = {"action": "query", "list": "search", "srsearch": term, "format": "json", "srlimit": 3}
-        headers = {"User-Agent": "MindDeckApp/1.0"}
-        res = requests.get(url, params=params, headers=headers, timeout=3)
-        if res.status_code == 200:
-            search_results = res.json().get("query", {}).get("search", [])
-            for item in search_results:
-                title = item.get("title", "")
-                if title and title != term and title not in fields:
-                    fields.insert(0, title) # 関連性の高そうなものを上位に挿入
-        
-        # 重複を除いて最大4個に絞る
-        seen = set()
-        unique_fields = []
-        for f in fields:
-            if f not in seen:
-                seen.add(f)
-                unique_fields.append(f)
-        fields = unique_fields[:4]
-    except Exception as e:
-        print("Fields error:", e)
-        
-    return {"fields": fields}
+    fields = []
+    # Web全体から用語に関連する専門分野や文脈を検索
+    web_results = search_web_general(f"{term} とは 分野 専門", max_results=5)
+    for res in web_results:
+        title = res.get("title", "")
+        # タイトル内の区切り文字（" | "や" - "）から関連分野やカテゴリを抽出
+        if " | " in title:
+            parts = title.split(" | ")
+            if len(parts) > 1 and len(parts[-1]) < 15:
+                fields.append(parts[-1].strip())
+        elif " - " in title:
+            parts = title.split(" - ")
+            if len(parts) > 1 and len(parts[-1]) < 15:
+                fields.append(parts[-1].strip())
 
-# ① 選択された分野（例: "コンピュータサイエンス"）に沿った解説文とタグを生成
+    # 一般的な主要分野もフォールバックとして追加
+    default_fields = ["コンピュータサイエンス", "経済・ビジネス", "心理学", "テクノロジー", "一般・基礎"]
+    for f in default_fields:
+        if f not in fields:
+            fields.append(f)
+            
+    # 重複を除去して最大4個に絞る
+    seen = set()
+    unique_fields = []
+    for f in fields:
+        clean_f = re.sub(r'[^\wぁ-んァ-ンー一-龥]', '', f)
+        if clean_f and clean_f not in seen and len(clean_f) <= 12:
+            seen.add(clean_f)
+            unique_fields.append(f)
+            
+    return {"fields": unique_fields[:4]}
+
+# ② 広範囲のWeb検索結果をAI的に合成して解説文とタグを自動生成
 @app.post("/api/ai-generate-explanation")
 def ai_generate_explanation(data: AiGenRequest):
     term = data.term.strip()
@@ -86,34 +94,23 @@ def ai_generate_explanation(data: AiGenRequest):
         return {"explanation": "用語が入力されていません。", "tag_candidate": ""}
     
     try:
-        url = "https://ja.wikipedia.org/w/api.php"
-        # 選択された分野の文脈も踏まえて検索
-        query = f"{term} {field}" if field != "一般" else term
+        # 選択された分野を考慮してWeb全体を詳細検索
+        query = f"{term} {field} 解説 意味"
+        web_results = search_web_general(query, max_results=4)
         
-        params = {"action": "query", "prop": "extracts", "exintro": True, "explaintext": True, "titles": term, "format": "json"}
-        headers = {"User-Agent": "MindDeckApp/1.0"}
-        res = requests.get(url, params=params, headers=headers, timeout=3)
-        extract = ""
-        if res.status_code == 200:
-            pages = res.json().get("query", {}).get("pages", {})
-            for page_id, page_info in pages.items():
-                if page_id != "-1" and "extract" in page_info:
-                    extract = page_info["extract"]
-        
-        if not extract:
-            search_params = {"action": "query", "list": "search", "srsearch": query, "format": "json", "srlimit": 1}
-            s_res = requests.get(url, params=search_params, headers=headers, timeout=3)
-            if s_res.status_code == 200:
-                s_data = s_res.json().get("query", {}).get("search", [])
-                if s_data:
-                    extract = re.sub(r'<.*?>', '', s_data[0].get("snippet", ""))
-
-        if extract:
-            explanation = f"【{field}】\n{extract[:300]}..."
+        snippets = []
+        for r in web_results:
+            if r.get("body"):
+                snippets.append(r["body"])
+                
+        if snippets:
+            # 複数サイトから得られた解説テキストを合成して要約風に構築
+            combined_text = " ".join(snippets)
+            explanation = f"【{field}】\n{combined_text[:300]}..."
         else:
-            explanation = f"【{field}】\n「{term}」についての解説文が見つかりませんでした。"
+            explanation = f"【{field}】\n「{term}」に関するWeb上の解説データが見つかりませんでした。"
             
-        # 選択された分野の名前からタグ候補を生成（例: #コンピュータサイエンス）
+        # 分野名からタグの候補を生成（例: #コンピュータサイエンス）
         clean_tag = re.sub(r'[（）\s・/]', '', field)
         tag_candidate = f"#{clean_tag}"
 
@@ -121,7 +118,7 @@ def ai_generate_explanation(data: AiGenRequest):
     except Exception as e:
         print("AI generation error:", e)
 
-    return {"explanation": f"【{field}分野】\nエラーが発生しました。", "tag_candidate": f"#{term}"}
+    return {"explanation": f"【{field}】\nエラーが発生しました。", "tag_candidate": f"#{term}"}
 
 @app.post("/api/generate-quiz")
 def generate_quiz(data: QuizRequest):
@@ -135,13 +132,16 @@ def generate_quiz(data: QuizRequest):
     if re.search(pattern, explanation, re.IGNORECASE):
         masked_explanation = re.sub(pattern, "[ ＿＿＿＿ ]", explanation, flags=re.IGNORECASE)
     else:
-        masked_explanation = f"【解説】\n{explanation}\n\nこの解説が示す用語は何でしょう？"
+        masked_explanation = f"【解説】\n{explanation}\n\n"
     
     other_terms = [c.term for c in all_cards if c.term != term]
-    wiki_terms = search_related_terms_from_wikipedia(term)
-    for w in wiki_terms:
-        if w != term and w not in other_terms and len(w) <= 15:
-            other_terms.append(w)
+    
+    # クイズ用の難易度アップ用関連ワードもWeb検索から補填
+    web_terms = search_web_general(term, max_results=3)
+    for wt in web_terms:
+        title = wt.get("title", "")
+        if title and title != term and len(title) <= 15 and title not in other_terms:
+            other_terms.append(title)
             
     fallback_pool = ["アフォーダンス", "認知バイアス", "スキーマ", "WebXR", "シャドーイング", "メタ認知", "エピソード記憶", "シナプス"]
     for d in fallback_pool:

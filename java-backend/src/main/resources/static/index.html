@@ -53,7 +53,6 @@
         .btn-danger { background: var(--danger); }
         .btn-danger:hover { background: var(--danger-hover); }
 
-        /* モーダル共通スタイル（カード一覧・編集用） */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); overflow-y: auto; padding: 20px; box-sizing: border-box; }
         .modal-content { background-color: var(--panel-bg); margin: 30px auto; padding: 20px; border: 1px solid var(--border-color); width: 100%; max-width: 600px; border-radius: 10px; box-sizing: border-box; }
         .close-modal { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; line-height: 20px; }
@@ -68,7 +67,7 @@
     </header>
 
     <div class="container">
-        <!-- 左側パネル：検索 ＆ ノートブック一覧・作成 -->
+        <!-- 左側パネル -->
         <div>
             <div class="panel">
                 <h2>🔍 逆引き全体検索</h2>
@@ -78,17 +77,17 @@
             <div class="panel">
                 <h2>📚 ノートブック</h2>
                 <input type="text" id="newNotebookTitle" placeholder="例: 認知心理学基礎">
-                <button onclick="createNotebook()">ノートブックを作成</button>
+                <button type="button" onclick="createNotebook()">ノートブックを作成</button>
                 <ul class="notebook-list" id="notebookList" style="margin-top: 12px;"></ul>
             </div>
         </div>
 
-        <!-- 右側パネル：単語帳・クイズタブ -->
+        <!-- 右側パネル -->
         <div>
             <div class="panel">
                 <div class="tab-buttons">
-                    <button class="tab-btn active" id="tabDeckBtn" onclick="switchTab('deck')">📖 単語帳</button>
-                    <button class="tab-btn" id="tabQuizBtn" onclick="switchTab('quiz')">✍️ 自動クイズ</button>
+                    <button type="button" class="tab-btn active" id="tabDeckBtn" onclick="switchTab('deck')">📖 単語帳</button>
+                    <button type="button" class="tab-btn" id="tabQuizBtn" onclick="switchTab('quiz')">✍️ 自動クイズ</button>
                 </div>
 
                 <!-- 単語帳タブ -->
@@ -97,14 +96,13 @@
                         <h2 style="border:none; margin-bottom:5px;">✍️ 用語の追加</h2>
                         <input type="text" id="cardTerm" placeholder="用語 (例: アフォーダンス)">
                         <textarea id="cardExpl" rows="2" placeholder="解説文を入力..."></textarea>
-                        <button onclick="createCard()">カードを保存</button>
+                        <button type="button" onclick="createCard()">カードを保存</button>
                     </div>
 
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <h2 id="currentNotebookTitle" style="margin:0; border:none;">直近のカード</h2>
-                        <button class="btn-secondary" style="width: auto; padding: 6px 12px; font-size: 0.85rem;" onclick="openCardListModal()">カード一覧へ ➔</button>
+                        <button type="button" class="btn-secondary" style="width: auto; padding: 6px 12px; font-size: 0.85rem;" onclick="openCardListModal()">カード一覧へ ➔</button>
                     </div>
-                    <!-- 直近2件表示用エリア -->
                     <div id="recentCardList"><p style="color: var(--text-sub);">左側のリストからノートブックを選択してください。</p></div>
                 </div>
 
@@ -114,13 +112,13 @@
                     <div id="quizContainer">
                         <p style="color: var(--text-sub);">ノートブックを選択し、クイズを生成してください。</p>
                     </div>
-                    <button onclick="loadQuiz()" style="margin-top: 15px; background: #10b981;">次の問題を作成</button>
+                    <button type="button" onclick="loadQuiz()" style="margin-top: 15px; background: #10b981;">次の問題を作成</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ②③ カード一覧画面（モーダル） -->
+    <!-- カード一覧画面（モーダル） -->
     <div id="cardListModal" class="modal">
         <div class="modal-content">
             <span class="close-modal" onclick="closeCardListModal()">&times;</span>
@@ -141,8 +139,8 @@
             <label style="font-size: 0.85rem; color: var(--text-sub);">解説文</label>
             <textarea id="editExpl" rows="3"></textarea>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
-                <button onclick="updateCard()">更新する</button>
-                <button class="btn-danger" onclick="deleteCard()">削除する</button>
+                <button type="button" onclick="updateCard()">更新する</button>
+                <button type="button" class="btn-danger" onclick="deleteCard()">削除する</button>
             </div>
         </div>
     </div>
@@ -161,11 +159,12 @@
         async function fetchNotebooks() {
             try {
                 const res = await fetch(`${JAVA_API}/notebooks`);
+                if (!res.ok) throw new Error('サーバーエラー');
                 const notebooks = await res.json();
                 const listEl = document.getElementById('notebookList');
                 listEl.innerHTML = '';
                 
-                if (notebooks.length === 0) {
+                if (!Array.isArray(notebooks) || notebooks.length === 0) {
                     listEl.innerHTML = '<li style="color: var(--text-sub); text-align: center; padding: 10px;">ノートブックがありません</li>';
                     return;
                 }
@@ -184,7 +183,7 @@
 
         async function createNotebook() {
             const titleInput = document.getElementById('newNotebookTitle');
-            if (!titleInput.value) {
+            if (!titleInput || !titleInput.value.trim()) {
                 alert('ノートブック名を入力してください');
                 return;
             }
@@ -192,7 +191,7 @@
                 const res = await fetch(`${JAVA_API}/notebooks`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: titleInput.value })
+                    body: JSON.stringify({ title: titleInput.value.trim() })
                 });
                 if (res.ok) {
                     titleInput.value = '';
@@ -202,6 +201,7 @@
                 }
             } catch (e) {
                 console.error(e);
+                alert('通信エラーが発生しました');
             }
         }
 
@@ -212,28 +212,36 @@
             
             try {
                 const res = await fetch(`${JAVA_API}/notebooks/${id}/cards`);
-                currentNotebookCards = await res.json();
+                if (!res.ok) throw new Error('カード取得失敗');
+                const cards = await res.json();
+                currentNotebookCards = Array.isArray(cards) ? cards : [];
                 renderRecentCards(currentNotebookCards);
             } catch (e) {
                 console.error('カードの取得に失敗しました', e);
+                currentNotebookCards = [];
+                renderRecentCards([]);
             }
         }
 
-        // 重複チェック付きカード保存
         async function createCard() {
             if (!currentNotebookId) {
                 alert('保存先のノートブックを左側のリストから選択してください！');
                 return;
             }
-            const term = document.getElementById('cardTerm').value.trim();
-            const explanation = document.getElementById('cardExpl').value.trim();
+            const termInput = document.getElementById('cardTerm');
+            const explInput = document.getElementById('cardExpl');
+            const term = termInput.value.trim();
+            const explanation = explInput.value.trim();
+
             if (!term || !explanation) {
                 alert('用語と解説を入力してください！');
                 return;
             }
 
-            // 【要件①対応】同一ノートブック内の重複チェック
-            const isDuplicate = currentNotebookCards.some(card => card.term.trim().toLowerCase() === term.toLowerCase());
+            // 重複チェック
+            const isDuplicate = Array.isArray(currentNotebookCards) && 
+                currentNotebookCards.some(card => card.term && card.term.trim().toLowerCase() === term.toLowerCase());
+            
             if (isDuplicate) {
                 alert(`「${term}」は既にこのノートブックに登録されています。同じ用語を複数保存することはできません。`);
                 return;
@@ -247,26 +255,25 @@
                 });
 
                 if (res.ok) {
-                    document.getElementById('cardTerm').value = '';
-                    document.getElementById('cardExpl').value = '';
+                    termInput.value = '';
+                    explInput.value = '';
                     selectNotebook(currentNotebookId, currentNotebookTitleText);
                 } else {
                     alert('カードの保存に失敗しました');
                 }
             } catch (e) {
                 console.error('通信エラー:', e);
+                alert('通信エラーが発生しました');
             }
         }
 
-        // ① 最初の画面では直近2つのカードのみを表示
         function renderRecentCards(cards) {
             const container = document.getElementById('recentCardList');
             container.innerHTML = '';
-            if (cards.length === 0) {
+            if (!cards || cards.length === 0) {
                 container.innerHTML = '<p style="color: var(--text-sub);">このノートブックにはまだカードが登録されていません。</p>';
                 return;
             }
-            // 直近2件を取得（配列の後ろ2件を取り出して逆順にするなど）
             const recentTwo = cards.slice(-2).reverse();
             recentTwo.forEach(card => {
                 const div = document.createElement('div');
@@ -280,7 +287,192 @@
             });
         }
 
-        // ② "カード一覧へ" ボタンを押した時のモーダル表示
         function openCardListModal() {
             if (!currentNotebookId) {
-                alert('ノートブックを選択
+                alert('ノートブックを選択してください。');
+                return;
+            }
+            document.getElementById('modalNotebookTitle').innerText = `「${currentNotebookTitleText}」のカード一覧`;
+            const container = document.getElementById('fullCardList');
+            container.innerHTML = '';
+
+            if (!currentNotebookCards || currentNotebookCards.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-sub);">登録されたカードはありません。</p>';
+            } else {
+                currentNotebookCards.forEach(card => {
+                    const div = document.createElement('div');
+                    div.className = 'card-card';
+                    div.onclick = () => {
+                        closeCardListModal();
+                        openEditModal(card);
+                    };
+                    div.innerHTML = `
+                        <div class="card-term">📌 ${card.term}</div>
+                        <div class="card-expl">${card.explanation}</div>
+                    `;
+                    container.appendChild(div);
+                });
+            }
+            document.getElementById('cardListModal').style.display = 'block';
+        }
+
+        function closeCardListModal() {
+            document.getElementById('cardListModal').style.display = 'none';
+        }
+
+        function openEditModal(card) {
+            document.getElementById('editCardId').value = card.id;
+            document.getElementById('editTerm').value = card.term;
+            document.getElementById('editExpl').value = card.explanation;
+            document.getElementById('editModal').style.display = 'block';
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+
+        async function updateCard() {
+            const cardId = document.getElementById('editCardId').value;
+            const term = document.getElementById('editTerm').value.trim();
+            const explanation = document.getElementById('editExpl').value.trim();
+
+            if (!term || !explanation) {
+                alert('用語と解説を入力してください。');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${JAVA_API}/cards/${cardId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ term, explanation })
+                });
+                if (res.ok) {
+                    closeEditModal();
+                    selectNotebook(currentNotebookId, currentNotebookTitleText);
+                } else {
+                    alert('カードの更新に失敗しました');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('通信エラーが発生しました');
+            }
+        }
+
+        async function deleteCard() {
+            const cardId = document.getElementById('editCardId').value;
+            if (!confirm('本当にこのカードを削除しますか？')) return;
+
+            try {
+                const res = await fetch(`${JAVA_API}/cards/${cardId}`, {
+                    method: 'DELETE'
+                });
+                if (res.ok) {
+                    closeEditModal();
+                    selectNotebook(currentNotebookId, currentNotebookTitleText);
+                } else {
+                    alert('カードの削除に失敗しました');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('通信エラーが発生しました');
+            }
+        }
+
+        async function searchCards() {
+            const keyword = document.getElementById('searchInput').value.trim();
+            if (!keyword) {
+                if (currentNotebookId) selectNotebook(currentNotebookId, currentNotebookTitleText);
+                return;
+            }
+            try {
+                const res = await fetch(`${JAVA_API}/cards/search?keyword=${encodeURIComponent(keyword)}`);
+                if (!res.ok) return;
+                const cards = await res.json();
+                const container = document.getElementById('recentCardList');
+                container.innerHTML = `<p style="font-size:0.85rem; color:#818cf8; margin-bottom:8px;">「${keyword}」の検索結果 (${cards.length}件)</p>`;
+                
+                if (!Array.isArray(cards) || cards.length === 0) {
+                    container.innerHTML += '<p style="color: var(--text-sub);">一致するカードはありません。</p>';
+                    return;
+                }
+
+                cards.forEach(card => {
+                    const div = document.createElement('div');
+                    div.className = 'card-card';
+                    div.onclick = () => openEditModal(card);
+                    div.innerHTML = `
+                        <div class="card-term">📌 ${card.term}</div>
+                        <div class="card-expl">${card.explanation}</div>
+                    `;
+                    container.appendChild(div);
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function switchTab(tab) {
+            document.getElementById('tabDeckBtn').classList.toggle('active', tab === 'deck');
+            document.getElementById('tabQuizBtn').classList.toggle('active', tab === 'quiz');
+            document.getElementById('deckView').style.display = tab === 'deck' ? 'block' : 'none';
+            document.getElementById('quizView').style.display = tab === 'quiz' ? 'block' : 'none';
+            if (tab === 'quiz') loadQuiz();
+        }
+
+        async function loadQuiz() {
+            const container = document.getElementById('quizContainer');
+            if (!currentNotebookId || !currentNotebookCards || currentNotebookCards.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-sub);">ノートブックを選択し、カードを登録してください。</p>';
+                return;
+            }
+            const target = currentNotebookCards[Math.floor(Math.random() * currentNotebookCards.length)];
+
+            try {
+                const response = await fetch(`${PYTHON_API}/generate-quiz`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target: target, all_cards: currentNotebookCards })
+                });
+                if (!response.ok) throw new Error();
+                const quiz = await response.json();
+
+                let html = `<div class="card-card" style="cursor:default;">
+                    <p style="font-weight: bold; color: #818cf8; margin-top:0;">Q. 空欄に入る用語は何でしょう？</p>
+                    <p style="background: #1e293b; padding: 12px; border-radius: 6px; line-height: 1.6;">${quiz.question}</p>
+                    <div style="margin-top: 15px;">`;
+                
+                quiz.choices.forEach(choice => {
+                    html += `<button type="button" class="choice-btn" onclick="checkAnswer(this, '${choice}', '${quiz.correct_answer}')">${choice}</button>`;
+                });
+                html += `</div><div id="quizResult" style="margin-top: 10px; font-weight: bold;"></div></div>`;
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = '<p style="color: #ef4444;">Pythonクイズサーバー（FastAPI）に接続できません。</p>';
+            }
+        }
+
+        function checkAnswer(btn, selected, correct) {
+            const allBtns = document.querySelectorAll('.choice-btn');
+            allBtns.forEach(b => b.disabled = true);
+            const resMsg = document.getElementById('quizResult');
+            if (selected === correct) {
+                btn.style.background = '#22c55e';
+                resMsg.style.color = '#22c55e';
+                resMsg.innerText = '正解です！ 🎉';
+            } else {
+                btn.style.background = '#ef4444';
+                resMsg.style.color = '#ef4444';
+                resMsg.innerText = `不正解… 正解は「${correct}」でした。`;
+                allBtns.forEach(b => { if (b.innerText === correct) b.style.background = '#22c55e'; });
+            }
+        }
+
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = "none";
+            }
+        }
+    </script>
+</body>
+</html>

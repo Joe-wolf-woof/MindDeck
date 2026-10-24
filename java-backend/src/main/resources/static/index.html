@@ -42,9 +42,11 @@
         .notebook-item:hover { background: #334155; }
         .notebook-item.active { border-color: var(--accent); background: #312e81; color: white; }
         .notebook-title { cursor: pointer; flex-grow: 1; word-break: break-all; }
-        .notebook-actions { display: flex; gap: 5px; }
-        .nb-action-btn { background: transparent; border: none; color: var(--text-sub); cursor: pointer; font-size: 0.85rem; padding: 2px 6px; width: auto; }
-        .nb-action-btn:hover { color: #fff; background: rgba(255,255,255,0.1); border-radius: 4px; }
+        .notebook-actions { display: flex; gap: 4px; }
+        
+        /* ② 文字を消して絵文字だけのボタンにするスタイル */
+        .nb-action-btn { background: transparent; border: none; cursor: pointer; font-size: 1rem; padding: 4px 6px; width: auto; border-radius: 4px; transition: background 0.2s; }
+        .nb-action-btn:hover { background: rgba(255,255,255,0.15); }
 
         .card-card { background: #0f172a; padding: 12px; margin-bottom: 10px; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; transition: border-color 0.2s; }
         .card-card:hover { border-color: #818cf8; }
@@ -60,6 +62,8 @@
         .btn-secondary:hover { background: #475569; }
         .btn-danger { background: var(--danger); }
         .btn-danger:hover { background: var(--danger-hover); }
+        
+        /* ② AI解説ボタンのアイコン変更(🤖 -> 💬) */
         .btn-ai { background: #059669; margin-bottom: 8px; font-size: 0.85rem; padding: 6px 10px; width: auto; }
         .btn-ai:hover { background: #047857; }
 
@@ -67,6 +71,9 @@
         .modal-content { background-color: var(--panel-bg); margin: 30px auto; padding: 20px; border: 1px solid var(--border-color); width: 100%; max-width: 600px; border-radius: 10px; box-sizing: border-box; }
         .close-modal { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; line-height: 20px; }
         .close-modal:hover { color: #fff; }
+        
+        .field-option-btn { background: #334155; margin-bottom: 8px; text-align: left; }
+        .field-option-btn:hover { background: #475569; }
     </style>
 </head>
 <body>
@@ -105,12 +112,13 @@
                     <div style="margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <h2 style="border:none; margin-bottom:5px;">✍️ 用語の追加</h2>
-                            <button type="button" class="btn-ai" onclick="generateAiExplanation()">🤖 AI解説を自動生成</button>
+                            <!-- ② アイコンを 💬 に変更 -->
+                            <button type="button" class="btn-ai" onclick="openFieldSelectModal()">💬 AI解説を自動生成</button>
                         </div>
                         <input type="text" id="cardTerm" placeholder="用語 (例: アフォーダンス)">
-                        <textarea id="cardExpl" rows="3" placeholder="解説文を入力... (AI自動生成ボタンで自動入力できます)"></textarea>
+                        <textarea id="cardExpl" rows="3" placeholder="解説文を入力..."></textarea>
                         
-                        <label style="font-size: 0.85rem; color: var(--text-sub);">タグ (例: #Java #心理学 ※スペース区切り)</label>
+                        <label style="font-size: 0.85rem; color: var(--text-sub);">タグ (例: #Java #重要)</label>
                         <input type="text" id="cardTags" placeholder="#Java #重要">
 
                         <button type="button" onclick="createCard()">カードを保存</button>
@@ -135,6 +143,16 @@
         </div>
     </div>
 
+    <!-- ① AI分野選択モーダル -->
+    <div id="fieldSelectModal" class="modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <span class="close-modal" onclick="closeFieldSelectModal()">&times;</span>
+            <h2>💬 分野の選択</h2>
+            <p style="color: var(--text-sub); font-size: 0.85rem; margin-bottom: 15px;">解説を生成する分野を選択してください。</p>
+            <div id="fieldOptionsContainer"></div>
+        </div>
+    </div>
+
     <!-- カード一覧モーダル -->
     <div id="cardListModal" class="modal">
         <div class="modal-content">
@@ -145,18 +163,25 @@
         </div>
     </div>
 
-    <!-- 編集・削除モーダル -->
+    <!-- 編集・削除モーダル（③ノートブック移動セレクトボックス追加） -->
     <div id="editModal" class="modal">
         <div class="modal-content">
             <span class="close-modal" onclick="closeEditModal()">&times;</span>
             <h2>カードの編集・削除</h2>
             <input type="hidden" id="editCardId">
+            
+            <label style="font-size: 0.85rem; color: var(--text-sub);">所属ノートブック</label>
+            <select id="editNotebookSelect"></select>
+
             <label style="font-size: 0.85rem; color: var(--text-sub);">用語</label>
             <input type="text" id="editTerm">
+            
             <label style="font-size: 0.85rem; color: var(--text-sub);">解説文</label>
             <textarea id="editExpl" rows="3"></textarea>
+            
             <label style="font-size: 0.85rem; color: var(--text-sub);">タグ</label>
             <input type="text" id="editTags" placeholder="#Java #重要">
+            
             <div style="display: flex; gap: 10px; margin-top: 10px;">
                 <button type="button" onclick="updateCard()">更新する</button>
                 <button type="button" class="btn-danger" onclick="deleteCard()">削除する</button>
@@ -171,6 +196,7 @@
         let currentNotebookTitleText = '';
         let currentNotebookCards = [];
         let allSystemCards = [];
+        let allNotebooksData = [];
 
         window.addEventListener('DOMContentLoaded', () => {
             fetchNotebooks();
@@ -184,28 +210,28 @@
             } catch (e) { console.error(e); }
         }
 
-        // ノートブック一覧取得 ＆ 編集・削除ボタン付きで描画
+        // ノートブック一覧取得 ＆ ② 📁を消し、文字なし絵文字ボタンにする
         async function fetchNotebooks() {
             try {
                 const res = await fetch(`${JAVA_API}/notebooks`);
                 if (!res.ok) throw new Error();
-                const notebooks = await res.json();
+                allNotebooksData = await res.json();
                 const listEl = document.getElementById('notebookList');
                 listEl.innerHTML = '';
                 
-                if (!Array.isArray(notebooks) || notebooks.length === 0) {
+                if (!Array.isArray(allNotebooksData) || allNotebooksData.length === 0) {
                     listEl.innerHTML = '<li style="color: var(--text-sub); text-align: center; padding: 10px;">ノートブックがありません</li>';
                     return;
                 }
 
-                notebooks.forEach(nb => {
+                allNotebooksData.forEach(nb => {
                     const li = document.createElement('li');
                     li.className = `notebook-item ${currentNotebookId === nb.id ? 'active' : ''}`;
                     li.innerHTML = `
-                        <span class="notebook-title" onclick="selectNotebook(${nb.id}, '${escapeHtml(nb.title)}')">📁 ${escapeHtml(nb.title)}</span>
+                        <span class="notebook-title" onclick="selectNotebook(${nb.id}, '${escapeHtml(nb.title)}')">${escapeHtml(nb.title)}</span>
                         <div class="notebook-actions">
-                            <button class="nb-action-btn" onclick="renameNotebook(${nb.id}, '${escapeHtml(nb.title)}')">✏️編集</button>
-                            <button class="nb-action-btn" style="color: #ef4444;" onclick="deleteNotebook(${nb.id})">🗑️削除</button>
+                            <button class="nb-action-btn" title="編集" onclick="renameNotebook(${nb.id}, '${escapeHtml(nb.title)}')">✏️</button>
+                            <button class="nb-action-btn" title="削除" onclick="deleteNotebook(${nb.id})">🗑️</button>
                         </div>
                     `;
                     listEl.appendChild(li);
@@ -236,7 +262,6 @@
             } catch (e) { console.error(e); }
         }
 
-        // ① ノートブックの名前変更機能
         async function renameNotebook(id, currentTitle) {
             const newTitle = prompt("新しいノートブック名を入力してください:", currentTitle);
             if (!newTitle || !newTitle.trim() || newTitle === currentTitle) return;
@@ -259,7 +284,6 @@
             } catch (e) { console.error(e); }
         }
 
-        // ① ノートブックの削除機能
         async function deleteNotebook(id) {
             if (!confirm("このノートブックと中のカードがすべて削除されます。よろしいですか？")) return;
 
@@ -295,31 +319,67 @@
             }
         }
 
-        // ③ 用語を入力してAI自動検索解説生成する機能
-        async function generateAiExplanation() {
+        // ① AI解説生成：用語の分野候補を取得してモーダルを開く
+        async function openFieldSelectModal() {
             const term = document.getElementById('cardTerm').value.trim();
             if (!term) {
                 alert('先に対象の「用語」を入力してください！');
                 return;
             }
-            
-            const explArea = document.getElementById('cardExpl');
-            explArea.value = 'AIが解説を自動検索中... 🤖';
+
+            const container = document.getElementById('fieldOptionsContainer');
+            container.innerHTML = '<p style="color: var(--text-sub);">関連する分野を検索中... 🤖</p>';
+            document.getElementById('fieldSelectModal').style.display = 'block';
 
             try {
-                const res = await fetch(`${PYTHON_API}/ai-generate-explanation`, {
+                const res = await fetch(`${PYTHON_API}/api/ai-get-fields`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ term: term })
                 });
                 if (res.ok) {
                     const data = await res.json();
+                    const fields = data.fields || [];
+                    container.innerHTML = '';
+                    fields.forEach(field => {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'choice-btn field-option-btn';
+                        btn.innerText = `📂 ${field}`;
+                        btn.onclick = () => generateAiExplanationByField(term, field);
+                        container.appendChild(btn);
+                    });
+                } else {
+                    container.innerHTML = '<p style="color: #ef4444;">分野候補の取得に失敗しました。</p>';
+                }
+            } catch (e) {
+                container.innerHTML = '<p style="color: #ef4444;">Pythonサーバーに接続できません。</p>';
+            }
+        }
+
+        function closeFieldSelectModal() {
+            document.getElementById('fieldSelectModal').style.display = 'none';
+        }
+
+        // ① 選択された分野で解説文＆タグを自動生成
+        async function generateAiExplanationByField(term, field) {
+            closeFieldSelectModal();
+            const explArea = document.getElementById('cardExpl');
+            const tagsInput = document.getElementById('cardTags');
+            
+            explArea.value = `「${field}」の観点で解説を生成中... 💬`;
+
+            try {
+                const res = await fetch(`${PYTHON_API}/api/ai-generate-explanation`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ term: term, field: field })
+                });
+                if (res.ok) {
+                    const data = await res.json();
                     explArea.value = data.explanation || '';
-                    
-                    // タグ欄が空なら自動でハッシュタグ候補を設定
-                    const tagsInput = document.getElementById('cardTags');
-                    if (!tagsInput.value.trim()) {
-                        tagsInput.value = `#${term.replace(/\s+/g, '')}`;
+                    if (data.tag_candidate && !tagsInput.value.trim()) {
+                        tagsInput.value = data.tag_candidate;
                     }
                 } else {
                     explArea.value = '';
@@ -331,7 +391,6 @@
             }
         }
 
-        // ② タグ付きカード保存処理
         async function createCard() {
             if (!currentNotebookId) {
                 alert('保存先のノートブックを左側のリストから選択してください！');
@@ -373,7 +432,6 @@
             } catch (e) { console.error(e); }
         }
 
-        // カード描画時にタグバッジを表示
         function renderRecentCards(cards) {
             const container = document.getElementById('recentCardList');
             container.innerHTML = '';
@@ -387,10 +445,7 @@
                 div.className = 'card-card';
                 div.onclick = () => openEditModal(card);
                 
-                let tagsHtml = '';
-                if (card.tags) {
-                    tagsHtml = card.tags.split(/\s+/).map(t => `<span class="tag-badge">${escapeHtml(t)}</span>`).join('');
-                }
+                let tagsHtml = card.tags ? card.tags.split(/\s+/).map(t => `<span class="tag-badge">${escapeHtml(t)}</span>`).join('') : '';
 
                 div.innerHTML = `
                     <div class="card-term">📌 ${escapeHtml(card.term)}</div>
@@ -434,21 +489,40 @@
 
         function closeCardListModal() { document.getElementById('cardListModal').style.display = 'none'; }
 
-        function openEditModal(card) {
+        // ③ カード編集モーダル：ノートブック移動用のセレクトボックスを埋め込む
+        async function openEditModal(card) {
             document.getElementById('editCardId').value = card.id;
             document.getElementById('editTerm').value = card.term;
             document.getElementById('editExpl').value = card.explanation;
             document.getElementById('editTags').value = card.tags || '';
+
+            // ノートブックセレクトボックスの構築
+            const nbSelect = document.getElementById('editNotebookSelect');
+            nbSelect.innerHTML = '';
+            allNotebooksData.forEach(nb => {
+                const opt = document.createElement('option');
+                opt.value = nb.id;
+                opt.textContent = nb.title;
+                if (card.notebook && card.notebook.id === nb.id) {
+                    opt.selected = true;
+                } else if (!card.notebook && nb.id === currentNotebookId) {
+                    opt.selected = true;
+                }
+                nbSelect.appendChild(opt);
+            });
+
             document.getElementById('editModal').style.display = 'block';
         }
 
         function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
 
+        // ③ カード更新処理（ノートブック移動対応）
         async function updateCard() {
             const cardId = document.getElementById('editCardId').value;
             const term = document.getElementById('editTerm').value.trim();
             const explanation = document.getElementById('editExpl').value.trim();
             const tags = document.getElementById('editTags').value.trim();
+            const notebookId = document.getElementById('editNotebookSelect').value;
 
             if (!term || !explanation) {
                 alert('用語と解説を入力してください。');
@@ -459,7 +533,7 @@
                 const res = await fetch(`${JAVA_API}/cards/${cardId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ term, explanation, tags })
+                    body: JSON.stringify({ term, explanation, tags, notebookId: Number(notebookId) })
                 });
                 if (res.ok) {
                     closeEditModal();

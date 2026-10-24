@@ -20,19 +20,16 @@ public class CardController {
     @Autowired
     private NotebookRepository notebookRepository;
 
-    // ノートブック一覧取得
     @GetMapping("/notebooks")
     public List<Notebook> getAllNotebooks() {
         return notebookRepository.findAll();
     }
 
-    // ノートブック作成
     @PostMapping("/notebooks")
     public Notebook createNotebook(@RequestBody Notebook notebook) {
         return notebookRepository.save(notebook);
     }
 
-    // ノートブック名変更 (PUT)
     @PutMapping("/notebooks/{id}")
     public Notebook updateNotebook(@PathVariable Long id, @RequestBody Notebook notebookDetails) {
         Notebook notebook = notebookRepository.findById(id)
@@ -41,19 +38,16 @@ public class CardController {
         return notebookRepository.save(notebook);
     }
 
-    // ノートブック削除 (DELETE)
     @DeleteMapping("/notebooks/{id}")
     public void deleteNotebook(@PathVariable Long id) {
         notebookRepository.deleteById(id);
     }
 
-    // 特定ノートブックの単語・カード一覧取得
     @GetMapping("/notebooks/{notebookId}/cards")
     public List<Card> getCardsByNotebookId(@PathVariable Long notebookId) {
         return cardRepository.findByNotebookId(notebookId);
     }
 
-    // 特定ノートブックの単語カード登録（tags対応）
     @PostMapping("/notebooks/{notebookId}/cards")
     public Card createCard(@PathVariable Long notebookId, @RequestBody CardRequest cardRequest) {
         Notebook notebook = notebookRepository.findById(notebookId)
@@ -68,7 +62,6 @@ public class CardController {
         return cardRepository.save(card);
     }
 
-    // 逆引き全体検索
     @GetMapping("/cards/search")
     public List<Card> searchCards(@RequestParam(value = "keyword", required = false) String keyword) {
         if (keyword == null || keyword.trim().isEmpty()) {
@@ -77,13 +70,12 @@ public class CardController {
         return cardRepository.searchCards(keyword);
     }
 
-    // カード削除
     @DeleteMapping("/cards/{id}")
     public void deleteCard(@PathVariable Long id) {
         cardRepository.deleteById(id);
     }
     
-    // カード更新（編集）（tags対応）
+    // ③ カード更新（ノートブック変更・タグ対応）
     @PutMapping("/cards/{id}")
     public Card updateCard(@PathVariable Long id, @RequestBody CardRequest cardRequest) {
         Card card = cardRepository.findById(id)
@@ -93,22 +85,29 @@ public class CardController {
         card.setExplanation(cardRequest.getExplanation());
         card.setTags(cardRequest.getTags());
         
+        // 別のノートブックへ移動する場合
+        if (cardRequest.getNotebookId() != null) {
+            Notebook notebook = notebookRepository.findById(cardRequest.getNotebookId())
+                    .orElseThrow(() -> new RuntimeException("Notebook not found"));
+            card.setNotebook(notebook);
+        }
+        
         return cardRepository.save(card);
     }
 
-    // リクエスト受信用クラス（tagsフィールドを含む）
     public static class CardRequest {
         private String term;
         private String explanation;
         private String tags;
+        private Long notebookId; // 追加
 
         public String getTerm() { return term; }
         public void setTerm(String term) { this.term = term; }
-        
         public String getExplanation() { return explanation; }
         public void setExplanation(String explanation) { this.explanation = explanation; }
-        
         public String getTags() { return tags; }
         public void setTags(String tags) { this.tags = tags; }
+        public Long getNotebookId() { return notebookId; }
+        public void setNotebookId(Long notebookId) { this.notebookId = notebookId; }
     }
 }

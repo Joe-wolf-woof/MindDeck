@@ -21,9 +21,9 @@ app.add_middleware(
 SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "YOUR_SERPER_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY")
 
-# Gemini APIの初期化
+# Gemini APIの初期化（最新の推奨モデルに変更）
 genai.configure(api_key=GEMINI_API_KEY)
-ai_model = genai.GenerativeModel("gemini-1.5-flash")
+ai_model = genai.GenerativeModel("gemini-2.0-flash")
 
 class CardItem(BaseModel):
     term: str
@@ -110,7 +110,7 @@ def ai_get_fields(data: AiFieldsRequest):
 @app.post("/api/ai-generate-explanation")
 def ai_generate_explanation(data: AiGenRequest):
     term = data.term.strip()
-    field = data.field or "general"
+    field = data.field or "一般"
     if not term:
         return {"explanation": "用語が入力されていません。", "tag_candidate": ""}
     

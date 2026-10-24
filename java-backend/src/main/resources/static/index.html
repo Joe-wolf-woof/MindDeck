@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MindDeck - アクティブラーニング単語帳</title>
     <style>
         :root {
@@ -12,30 +13,51 @@
             --accent: #4f46e5;
             --accent-hover: #4338ca;
             --border-color: #334155;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
         }
-        body { font-family: sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: var(--bg-color); color: var(--text-main); }
-        header { text-align: center; margin-bottom: 30px; }
-        header h1 { color: #818cf8; font-size: 2rem; margin-bottom: 5px; }
-        header p { color: var(--text-sub); }
-        .container { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+        body { font-family: sans-serif; max-width: 900px; margin: 0 auto; padding: 15px; background: var(--bg-color); color: var(--text-main); box-sizing: border-box; }
+        header { text-align: center; margin-bottom: 20px; }
+        header h1 { color: #818cf8; font-size: 1.8rem; margin-bottom: 5px; }
+        header p { color: var(--text-sub); font-size: 0.9rem; }
+        
+        .container { display: grid; grid-template-columns: 1fr 2fr; gap: 15px; }
         @media (max-width: 768px) { .container { grid-template-columns: 1fr; } }
-        .panel { background: var(--panel-bg); padding: 20px; margin-bottom: 20px; border-radius: 10px; border: 1px solid var(--border-color); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        h2 { font-size: 1.2rem; margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; color: #a5b4fc; }
-        input, textarea, select { width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 12px; background: #0f172a; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-main); box-sizing: border-box; }
-        button { background: var(--accent); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; transition: background 0.2s; }
+        
+        .panel { background: var(--panel-bg); padding: 15px; margin-bottom: 15px; border-radius: 10px; border: 1px solid var(--border-color); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        h2 { font-size: 1.1rem; margin-top: 0; margin-bottom: 12px; border-bottom: 2px solid var(--border-color); padding-bottom: 6px; color: #a5b4fc; }
+        
+        input, textarea, select { width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 12px; background: #0f172a; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-main); box-sizing: border-box; font-size: 1rem; }
+        button { background: var(--accent); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; transition: background 0.2s; font-size: 0.95rem; }
         button:hover { background: var(--accent-hover); }
+        
         .tab-buttons { display: flex; gap: 10px; margin-bottom: 15px; }
         .tab-btn { background: #334155; color: var(--text-sub); }
         .tab-btn.active { background: var(--accent); color: white; }
-        .notebook-list { list-style: none; padding: 0; margin: 0; max-height: 250px; overflow-y: auto; }
-        .notebook-item { padding: 10px; margin-bottom: 6px; background: #0f172a; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        
+        .notebook-list { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; }
+        .notebook-item { padding: 10px; margin-bottom: 6px; background: #0f172a; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.2s; word-break: break-all; }
         .notebook-item:hover { background: #334155; }
         .notebook-item.active { border-color: var(--accent); background: #312e81; color: white; }
-        .card-card { background: #0f172a; padding: 12px; margin-bottom: 10px; border-radius: 6px; border: 1px solid var(--border-color); }
-        .card-term { font-weight: bold; color: #818cf8; margin-bottom: 4px; font-size: 1.1rem; }
-        .card-expl { color: var(--text-main); font-size: 0.95rem; line-height: 1.5; }
+        
+        .card-card { background: #0f172a; padding: 12px; margin-bottom: 10px; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; transition: border-color 0.2s; }
+        .card-card:hover { border-color: #818cf8; }
+        .card-term { font-weight: bold; color: #818cf8; margin-bottom: 4px; font-size: 1.05rem; }
+        .card-expl { color: var(--text-main); font-size: 0.9rem; line-height: 1.4; }
+        
         .choice-btn { background: #334155; margin-top: 8px; text-align: left; }
         .choice-btn:hover { background: #475569; }
+
+        .btn-secondary { background: #334155; margin-bottom: 10px; }
+        .btn-secondary:hover { background: #475569; }
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: var(--danger-hover); }
+
+        /* モーダル共通スタイル（カード一覧・編集用） */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); overflow-y: auto; padding: 20px; box-sizing: border-box; }
+        .modal-content { background-color: var(--panel-bg); margin: 30px auto; padding: 20px; border: 1px solid var(--border-color); width: 100%; max-width: 600px; border-radius: 10px; box-sizing: border-box; }
+        .close-modal { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; line-height: 20px; }
+        .close-modal:hover { color: #fff; }
     </style>
 </head>
 <body>
@@ -65,21 +87,25 @@
         <div>
             <div class="panel">
                 <div class="tab-buttons">
-                    <button class="tab-btn active" id="tabDeckBtn" onclick="switchTab('deck')">📖 単語帳一覧</button>
-                    <button class="tab-btn" id="tabQuizBtn" onclick="switchTab('quiz')">✍️ 自動クイズ挑戦</button>
+                    <button class="tab-btn active" id="tabDeckBtn" onclick="switchTab('deck')">📖 単語帳</button>
+                    <button class="tab-btn" id="tabQuizBtn" onclick="switchTab('quiz')">✍️ 自動クイズ</button>
                 </div>
 
-                <!-- 単語帳タブ（カード登録 ＆ 選択したノートブックのカード一覧表示） -->
+                <!-- 単語帳タブ -->
                 <div id="deckView">
-                    <div style="margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
+                    <div style="margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
                         <h2 style="border:none; margin-bottom:5px;">✍️ 用語の追加</h2>
                         <input type="text" id="cardTerm" placeholder="用語 (例: アフォーダンス)">
                         <textarea id="cardExpl" rows="2" placeholder="解説文を入力..."></textarea>
                         <button onclick="createCard()">カードを保存</button>
                     </div>
 
-                    <h2 id="currentNotebookTitle">単語カード一覧</h2>
-                    <div id="cardList"><p style="color: var(--text-sub);">左側のリストからノートブックを選択してください。</p></div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h2 id="currentNotebookTitle" style="margin:0; border:none;">直近のカード</h2>
+                        <button class="btn-secondary" style="width: auto; padding: 6px 12px; font-size: 0.85rem;" onclick="openCardListModal()">カード一覧へ ➔</button>
+                    </div>
+                    <!-- 直近2件表示用エリア -->
+                    <div id="recentCardList"><p style="color: var(--text-sub);">左側のリストからノートブックを選択してください。</p></div>
                 </div>
 
                 <!-- クイズタブ -->
@@ -94,6 +120,33 @@
         </div>
     </div>
 
+    <!-- ②③ カード一覧画面（モーダル） -->
+    <div id="cardListModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeCardListModal()">&times;</span>
+            <h2 id="modalNotebookTitle" style="color: #a5b4fc;">カード一覧</h2>
+            <p style="color: var(--text-sub); font-size: 0.85rem; margin-bottom: 15px;">カードをタップすると編集・削除ができます。</p>
+            <div id="fullCardList" style="max-height: 60vh; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <!-- 編集・削除モーダル -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeEditModal()">&times;</span>
+            <h2>カードの編集・削除</h2>
+            <input type="hidden" id="editCardId">
+            <label style="font-size: 0.85rem; color: var(--text-sub);">用語</label>
+            <input type="text" id="editTerm">
+            <label style="font-size: 0.85rem; color: var(--text-sub);">解説文</label>
+            <textarea id="editExpl" rows="3"></textarea>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button onclick="updateCard()">更新する</button>
+                <button class="btn-danger" onclick="deleteCard()">削除する</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const JAVA_API = 'https://minddeck-java-app.onrender.com/api';
         const PYTHON_API = 'https://minddeck-python-api.onrender.com/api';
@@ -101,12 +154,10 @@
         let currentNotebookTitleText = '';
         let currentNotebookCards = [];
 
-        // ページ読み込み時にノートブック一覧を取得
         window.addEventListener('DOMContentLoaded', () => {
             fetchNotebooks();
         });
 
-        // ノートブック一覧をサーバーから取得して左側リストに表示
         async function fetchNotebooks() {
             try {
                 const res = await fetch(`${JAVA_API}/notebooks`);
@@ -131,7 +182,6 @@
             }
         }
 
-        // 新規ノートブックを作成
         async function createNotebook() {
             const titleInput = document.getElementById('newNotebookTitle');
             if (!titleInput.value) {
@@ -155,32 +205,37 @@
             }
         }
 
-        // ノートブックを選択したときの処理（紐づくカードを縦に並べて表示する）
         async function selectNotebook(id, title) {
             currentNotebookId = id;
             currentNotebookTitleText = title;
-            document.getElementById('currentNotebookTitle').innerText = `「${title}」のカード一覧`;
             fetchNotebooks();
             
             try {
                 const res = await fetch(`${JAVA_API}/notebooks/${id}/cards`);
                 currentNotebookCards = await res.json();
-                renderCards(currentNotebookCards);
+                renderRecentCards(currentNotebookCards);
             } catch (e) {
                 console.error('カードの取得に失敗しました', e);
             }
         }
 
-        // 選択中のノートブックにカードを保存する
+        // 重複チェック付きカード保存
         async function createCard() {
             if (!currentNotebookId) {
                 alert('保存先のノートブックを左側のリストから選択してください！');
                 return;
             }
-            const term = document.getElementById('cardTerm').value;
-            const explanation = document.getElementById('cardExpl').value;
+            const term = document.getElementById('cardTerm').value.trim();
+            const explanation = document.getElementById('cardExpl').value.trim();
             if (!term || !explanation) {
                 alert('用語と解説を入力してください！');
+                return;
+            }
+
+            // 【要件①対応】同一ノートブック内の重複チェック
+            const isDuplicate = currentNotebookCards.some(card => card.term.trim().toLowerCase() === term.toLowerCase());
+            if (isDuplicate) {
+                alert(`「${term}」は既にこのノートブックに登録されています。同じ用語を複数保存することはできません。`);
                 return;
             }
 
@@ -194,8 +249,6 @@
                 if (res.ok) {
                     document.getElementById('cardTerm').value = '';
                     document.getElementById('cardExpl').value = '';
-                    alert('カードを保存しました！');
-                    // 保存後、自動でそのノートブックのカード一覧を再読み込みして反映
                     selectNotebook(currentNotebookId, currentNotebookTitleText);
                 } else {
                     alert('カードの保存に失敗しました');
@@ -205,17 +258,20 @@
             }
         }
 
-        // カードを縦に並べて表示する関数
-        function renderCards(cards) {
-            const container = document.getElementById('cardList');
+        // ① 最初の画面では直近2つのカードのみを表示
+        function renderRecentCards(cards) {
+            const container = document.getElementById('recentCardList');
             container.innerHTML = '';
             if (cards.length === 0) {
                 container.innerHTML = '<p style="color: var(--text-sub);">このノートブックにはまだカードが登録されていません。</p>';
                 return;
             }
-            cards.forEach(card => {
+            // 直近2件を取得（配列の後ろ2件を取り出して逆順にするなど）
+            const recentTwo = cards.slice(-2).reverse();
+            recentTwo.forEach(card => {
                 const div = document.createElement('div');
                 div.className = 'card-card';
+                div.onclick = () => openEditModal(card);
                 div.innerHTML = `
                     <div class="card-term">📌 ${card.term}</div>
                     <div class="card-expl">${card.explanation}</div>
@@ -224,90 +280,7 @@
             });
         }
 
-        // キーワード検索
-        async function searchCards() {
-            const keyword = document.getElementById('searchInput').value;
-            if (!keyword) {
-                if (currentNotebookId) selectNotebook(currentNotebookId, currentNotebookTitleText);
-                return;
-            }
-            try {
-                const res = await fetch(`${JAVA_API}/cards/search?keyword=${encodeURIComponent(keyword)}`);
-                const cards = await res.json();
-                document.getElementById('currentNotebookTitle').innerText = `「${keyword}」の検索結果`;
-                renderCards(cards);
-            } catch (e) {
-                console.error(e);
-            }
-        }
-
-        // タブ切り替え
-        function switchTab(tab) {
-            document.getElementById('tabDeckBtn').classList.toggle('active', tab === 'deck');
-            document.getElementById('tabQuizBtn').classList.toggle('active', tab === 'quiz');
-            document.getElementById('deckView').style.display = tab === 'deck' ? 'block' : 'none';
-            document.getElementById('quizView').style.display = tab === 'quiz' ? 'block' : 'none';
-            if (tab === 'quiz') loadQuiz();
-        }
-
-        // クイズ読み込み
-        async function loadQuiz() {
-            const container = document.getElementById('quizContainer');
-            if (!currentNotebookId || currentNotebookCards.length === 0) {
-                container.innerHTML = '<p style="color: var(--text-sub);">ノートブックを選択し、カードを登録してください。</p>';
-                return;
-            }
-            const target = currentNotebookCards[Math.floor(Math.random() * currentNotebookCards.length)];
-
-            try {
-                const response = await fetch(`${PYTHON_API}/generate-quiz`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ target: target, all_cards: currentNotebookCards })
-                });
-                const quiz = await response.json();
-
-                let html = `<div class="card-card">
-                    <p style="font-weight: bold; color: #818cf8; margin-top:0;">Q. 空欄に入る用語は何でしょう？</p>
-                    <p style="background: #1e293b; padding: 12px; border-radius: 6px; line-height: 1.6;">${quiz.question}</p>
-                    <div style="margin-top: 15px;">`;
-                
-                quiz.choices.forEach(choice => {
-                    html += `<button class="choice-btn" onclick="checkAnswer(this, '${choice}', '${quiz.correct_answer}')">${choice}</button>`;
-                });
-                html += `</div><div id="quizResult" style="margin-top: 10px; font-weight: bold;"></div></div>`;
-                container.innerHTML = html;
-            } catch (e) {
-                container.innerHTML = '<p style="color: #ef4444;">Pythonクイズサーバー（FastAPI）に接続できません。</p>';
-            }
-        }
-
-        function checkAnswer(btn, selected, correct) {
-            const allBtns = document.querySelectorAll('.choice-btn');
-            allBtns.forEach(b => b.disabled = true);
-            const resMsg = document.getElementById('quizResult');
-            if (selected === correct) {
-                btn.style.background = '#22c55e';
-                resMsg.style.color = '#22c55e';
-                resMsg.innerText = '正解です！ 🎉';
-            } else {
-                btn.style.background = '#ef4444';
-                resMsg.style.color = '#ef4444';
-                resMsg.innerText = `不正解… 正解は「${correct}」でした。`;
-                allBtns.forEach(b => { if (b.innerText === correct) b.style.background = '#22c55e'; });
-            }
-        }
-    </script>
-</body>
-</html>
-
-
-
-
-
-
-
-
-
-
-
+        // ② "カード一覧へ" ボタンを押した時のモーダル表示
+        function openCardListModal() {
+            if (!currentNotebookId) {
+                alert('ノートブックを選択

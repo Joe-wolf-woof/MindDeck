@@ -1,9 +1,11 @@
+import os
+import requests
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import random
 import re
-from duckduckgo_search import DDGS
+import google.generativeai as genai
 
 app = FastAPI()
 
@@ -14,6 +16,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 各種APIキーの設定（※RenderのEnvironment環境変数から読み込まれます）
+SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "YOUR_SERPER_API_KEY")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY")
+
+# Gemini APIの初期化
+genai.configure(api_key=GEMINI_API_KEY)
+ai_model = genai.GenerativeModel("gemini-1.5-flash")
 
 class CardItem(BaseModel):
     term: str
@@ -31,22 +41,37 @@ class AiGenRequest(BaseModel):
     term: str
     field: str | None = None
 
-# 広範囲のWebサイトを横断検索する関数
-def search_web_general(query: str, max_results=5) -> list[dict]:
-    results = []
+# Serper.dev（Google検索API）を使ってGoogle検索を行う関数
+def search_google_serper(query: str, num_results=4) -> list[dict]:
+    url = "https://google.serper.dev/search"
+    payload = {
+        "q": query,
+        "gl": "jp",
+        "hl": "ja",
+        "num": num_results
+    }
+    headers = {
+        "X-API-KEY": SERPER_API_KEY,
+        "Content-Type": "application/json"
+    }
     try:
-        with DDGS() as ddgs:
-            for r in ddgs.text(query, region="jp-jp", max_results=max_results):
+        response = requests.post(url, json=payload, headers=headers, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            organic = data.get("organic", [])
+            results = []
+            for item in organic:
                 results.append({
-                    "title": r.get("title", ""),
-                    "body": r.get("body", ""),
-                    "href": r.get("href", "")
+                    "title": item.get("title", ""),
+                    "body": item.get("snippet", ""),
+                    "href": item.get("link", "")
                 })
+            return results
     except Exception as e:
-        print("Web search error:", e)
-    return results
+        print("Serper API error:", e)
+    return []
 
-# ① 広範囲のWeb検索から分野候補を自動生成
+# ① Serper.devの検索結果から分野候補を自動抽出
 @app.post("/api/ai-get-fields")
 def ai_get_fields(data: AiFieldsRequest):
     term = data.term.strip()
@@ -54,11 +79,9 @@ def ai_get_fields(data: AiFieldsRequest):
         return {"fields": ["コンピュータサイエンス", "経済・ビジネス", "心理学", "一般"]}
     
     fields = []
-    # Web全体から用語に関連する専門分野や文脈を検索
-    web_results = search_web_general(f"{term} とは 分野 専門", max_results=5)
+    web_results = search_google_serper(f"{term} とは 分野 専門", num_results=4)
     for res in web_results:
         title = res.get("title", "")
-        # タイトル内の区切り文字（" | "や" - "）から関連分野やカテゴリを抽出
         if " | " in title:
             parts = title.split(" | ")
             if len(parts) > 1 and len(parts[-1]) < 15:
@@ -68,13 +91,11 @@ def ai_get_fields(data: AiFieldsRequest):
             if len(parts) > 1 and len(parts[-1]) < 15:
                 fields.append(parts[-1].strip())
 
-    # 一般的な主要分野もフォールバックとして追加
     default_fields = ["コンピュータサイエンス", "経済・ビジネス", "心理学", "テクノロジー", "一般・基礎"]
     for f in default_fields:
         if f not in fields:
             fields.append(f)
             
-    # 重複を除去して最大4個に絞る
     seen = set()
     unique_fields = []
     for f in fields:
@@ -85,40 +106,50 @@ def ai_get_fields(data: AiFieldsRequest):
             
     return {"fields": unique_fields[:4]}
 
-# ② 広範囲のWeb検索結果をAI的に合成して解説文とタグを自動生成
+# ② 【RAG方式】Serper.dev（Google検索） ＋ Geminiによる要約・解説生成
 @app.post("/api/ai-generate-explanation")
 def ai_generate_explanation(data: AiGenRequest):
     term = data.term.strip()
-    field = data.field or "一般"
+    field = data.field or "general"
     if not term:
         return {"explanation": "用語が入力されていません。", "tag_candidate": ""}
     
+    # Step 1: Serper.devでGoogle検索し、関連情報を収集
+    query = f"{term} {field} 意味 定義"
+    web_results = search_google_serper(query, num_results=4)
+    
+    snippets = [r["body"] for r in web_results if r.get("body")]
+    context = "\n".join(snippets) if snippets else "特に関連する詳細なWeb情報が見つかりませんでした。"
+
+    # Step 2: Gemini API に検索情報を読ませて綺麗な解説文に要約させる（RAG）
+    prompt = f"""
+    あなたは学習用単語帳のAIアシスタントです。
+    以下のGoogle検索から得られた参考情報を基に、「{term}」という用語について、「{field}」の分野における解説文を作成してください。
+
+    【検索された参考情報】
+    {context}
+
+    【出力の条件】
+    1. 学習用単語帳として分かりやすく、150〜250文字程度の解説文にまとめてください。
+    2. 文頭に必ず「【{field}分野の解説】」と記載してください。
+    3. 出力は解説文のテキストのみにしてください。
+    """
+
     try:
-        # 選択された分野を考慮してWeb全体を詳細検索
-        query = f"{term} {field} 解説 意味"
-        web_results = search_web_general(query, max_results=4)
-        
-        snippets = []
-        for r in web_results:
-            if r.get("body"):
-                snippets.append(r["body"])
-                
-        if snippets:
-            # 複数サイトから得られた解説テキストを合成して要約風に構築
-            combined_text = " ".join(snippets)
-            explanation = f"【{field}】\n{combined_text[:300]}..."
-        else:
-            explanation = f"【{field}】\n「{term}」に関するWeb上の解説データが見つかりませんでした。"
-            
-        # 分野名からタグの候補を生成（例: #コンピュータサイエンス）
-        clean_tag = re.sub(r'[（）\s・/]', '', field)
-        tag_candidate = f"#{clean_tag}"
-
-        return {"explanation": explanation, "tag_candidate": tag_candidate}
+        response = ai_model.generate_content(prompt)
+        explanation = response.text.strip()
     except Exception as e:
-        print("AI generation error:", e)
+        print("Gemini API error:", e)
+        explanation = f"【{field}分野】\nAIによる解説の要約生成に失敗しました。"
 
-    return {"explanation": f"【{field}】\nエラーが発生しました。", "tag_candidate": f"#{term}"}
+    # タグ候補の生成（例: #コンピュータサイエンス）
+    clean_tag = re.sub(r'[（）\s・/]', '', field)
+    tag_candidate = f"#{clean_tag}"
+
+    return {
+        "explanation": explanation,
+        "tag_candidate": tag_candidate
+    }
 
 @app.post("/api/generate-quiz")
 def generate_quiz(data: QuizRequest):
@@ -132,12 +163,11 @@ def generate_quiz(data: QuizRequest):
     if re.search(pattern, explanation, re.IGNORECASE):
         masked_explanation = re.sub(pattern, "[ ＿＿＿＿ ]", explanation, flags=re.IGNORECASE)
     else:
-        masked_explanation = f"【解説】\n{explanation}\n\n"
+        masked_explanation = f"【解説】\n{explanation}\n\nこの解説が示す用語は何でしょう？"
     
     other_terms = [c.term for c in all_cards if c.term != term]
     
-    # クイズ用の難易度アップ用関連ワードもWeb検索から補填
-    web_terms = search_web_general(term, max_results=3)
+    web_terms = search_google_serper(term, num_results=3)
     for wt in web_terms:
         title = wt.get("title", "")
         if title and title != term and len(title) <= 15 and title not in other_terms:

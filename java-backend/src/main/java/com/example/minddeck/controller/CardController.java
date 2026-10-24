@@ -49,11 +49,23 @@ public class CardController {
 
     // 単語登録 (POST /api/notebooks/{notebookId}/cards)
     @PostMapping("/notebooks/{notebookId}/cards")
+    public Card createCard(@PathVariable Long notebookId, @RequestBody CardRequest cardRequest) {
+        Notebook notebook = notebookRepository.findById(notebookId)
+            .orElseThrow(() -> new RuntimeException("Notebook not found"));
+
+        Card card = new Card();
+        card.setTerm(cardRequest.getTerm());
+        card.setExplanation(cardRequest.getExplanation());
+        card.setNotebook(notebook);
+
+        return cardRepository.save(card);
+    }
+   /* @PostMapping("/notebooks/{notebookId}/cards")
     public Card createCard(@PathVariable Long notebookId, @RequestBody Card cardRequest) {
         Notebook notebook = notebookRepository.findById(notebookId)
                 .orElseThrow(() -> new RuntimeException("Notebook not found"));
         cardRequest.setNotebook(notebook);
-        return cardRepository.save(cardRequest);
+        return cardRepository.save(cardRequest);*/
     }
 
     // 逆引き検索 (GET /api/cards/search)

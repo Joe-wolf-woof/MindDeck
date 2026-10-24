@@ -35,7 +35,7 @@ def generate_quiz(data: QuizRequest):
         masked_explanation = re.sub(pattern, "[ ＿＿＿＿ ]", explanation, flags=re.IGNORECASE)
     else:
         # ③ 【解説ヒント】を【解説】に統一
-        masked_explanation = f"【解説】\n{explanation}\n\nこの解説が示す用語は何でしょう？"
+        masked_explanation = f"【解説】\n{explanation}\n"
     
     # 選択肢のバリエーション（難易度アップ用プール）
     other_terms = [c.term for c in all_cards if c.term != term]

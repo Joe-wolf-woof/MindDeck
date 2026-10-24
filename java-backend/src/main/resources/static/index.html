@@ -30,8 +30,11 @@
         h2 { font-size: 1.1rem; margin-top: 0; margin-bottom: 12px; border-bottom: 2px solid var(--border-color); padding-bottom: 6px; color: #a5b4fc; }
         
         input, textarea, select { width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 12px; background: #0f172a; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-main); box-sizing: border-box; font-size: 1rem; }
+        input:disabled, textarea:disabled { opacity: 0.6; cursor: not-allowed; }
+        
         button { background: var(--accent); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; transition: background 0.2s; font-size: 0.95rem; }
         button:hover { background: var(--accent-hover); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
         
         .tab-buttons { display: flex; gap: 10px; margin-bottom: 15px; }
         .tab-btn { background: #334155; color: var(--text-sub); }
@@ -110,7 +113,7 @@
                     <div style="margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <h2 style="border:none; margin-bottom:5px;">✍️ 用語の追加</h2>
-                            <button type="button" class="btn-ai" onclick="openFieldSelectModal()">💬 AI解説を自動生成</button>
+                            <button type="button" id="aiGenBtn" class="btn-ai" onclick="openFieldSelectModal()">💬 AI解説を自動生成</button>
                         </div>
                         <input type="text" id="cardTerm" placeholder="用語 (例: アフォーダンス)">
                         <textarea id="cardExpl" rows="3" placeholder="解説文を入力..."></textarea>
@@ -118,7 +121,7 @@
                         <label style="font-size: 0.85rem; color: var(--text-sub);">タグ (例: #Java #重要)</label>
                         <input type="text" id="cardTags" placeholder="#Java #重要">
 
-                        <button type="button" onclick="createCard()">カードを保存</button>
+                        <button type="button" id="saveCardBtn" onclick="createCard()">カードを保存</button>
                     </div>
 
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -315,7 +318,6 @@
             }
         }
 
-        // ① AI分野選択モーダルを開く（URLの重複 /api を修正）
         async function openFieldSelectModal() {
             const term = document.getElementById('cardTerm').value.trim();
             if (!term) {
@@ -328,7 +330,7 @@
             document.getElementById('fieldSelectModal').style.display = 'block';
 
             try {
-                const res = await fetch(`${PYTHON_API}/ai-get-fields`, { // 修正: /api/ai-get-fields から修正
+                const res = await fetch(`${PYTHON_API}/ai-get-fields`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ term: term })
@@ -357,16 +359,26 @@
             document.getElementById('fieldSelectModal').style.display = 'none';
         }
 
-        // ① 選択された分野で解説文＆タグを自動生成（URLの重複 /api を修正）
+        // 💬 選択された分野で解説生成（生成中は入力欄とボタンをロック）
         async function generateAiExplanationByField(term, field) {
             closeFieldSelectModal();
+            const termInput = document.getElementById('cardTerm');
             const explArea = document.getElementById('cardExpl');
             const tagsInput = document.getElementById('cardTags');
+            const aiGenBtn = document.getElementById('aiGenBtn');
+            const saveCardBtn = document.getElementById('saveCardBtn');
+
+            // --- ① 生成開始：入力フィールドとボタンをすべてロック ---
+            termInput.disabled = true;
+            explArea.disabled = true;
+            tagsInput.disabled = true;
+            aiGenBtn.disabled = true;
+            saveCardBtn.disabled = true;
             
             explArea.value = `「${field}」の観点で解説を生成中... 💬`;
 
             try {
-                const res = await fetch(`${PYTHON_API}/ai-generate-explanation`, { // 修正: /api/ai-generate-explanation から修正
+                const res = await fetch(`${PYTHON_API}/ai-generate-explanation`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ term: term, field: field })
@@ -384,6 +396,13 @@
             } catch (e) {
                 explArea.value = '';
                 alert('Python AIサーバーに接続できません');
+            } finally {
+                // --- ② 生成終了（成功・失敗問わず）：ロックを解除 ---
+                termInput.disabled = false;
+                explArea.disabled = false;
+                tagsInput.disabled = false;
+                aiGenBtn.disabled = false;
+                saveCardBtn.disabled = false;
             }
         }
 

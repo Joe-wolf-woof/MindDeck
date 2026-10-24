@@ -21,7 +21,7 @@ app.add_middleware(
 SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "YOUR_SERPER_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY")
 
-# Gemini APIの初期化（エラーメッセージが指定する最新モデルに変更）
+# Gemini APIの初期化
 genai.configure(api_key=GEMINI_API_KEY)
 ai_model = genai.GenerativeModel("gemini-3.8-flash")
 
@@ -130,7 +130,7 @@ def ai_generate_explanation(data: AiGenRequest):
     {context}
 
     【出力の条件】
-    1. 学習用単語帳として分かりやすく、150〜250文字程度の解説文にまとめてください。
+    1. 学習用単語帳として分かりやすく、100〜150文字程度の解説文にまとめてください。
     2. 文頭に必ず「【{field}分野の解説】」と記載してください。
     3. 出力は解説文のテキストのみにしてください。
     """
@@ -153,11 +153,11 @@ def ai_generate_explanation(data: AiGenRequest):
 
 @app.post("/api/generate-quiz")
 def generate_quiz(data: QuizRequest):
-    target = data.target
+    type_target = data.target
     all_cards = data.all_cards
     
-    term = target.term
-    explanation = target.explanation
+    term = type_target.term
+    explanation = type_target.explanation
     
     pattern = re.escape(term)
     if re.search(pattern, explanation, re.IGNORECASE):
